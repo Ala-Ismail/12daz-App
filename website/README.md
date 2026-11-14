@@ -49,3 +49,7 @@ When publishing a new desktop version:
 The support link is <https://paypal.me/12dazapp>, labelled **Buy me coffee** beneath the download panel and in the footer. A closing section above the footer pairs an actual application screenshot with **Would you buy me a cuppa?** and a **Buy me a cuppa** button. Its image, `assets/12daz-coffee-and-muffin-gui.png`, captures the v0.1.3 GUI after opening `outputs/coffee_and_muffin.12da` through the application's normal loading workflow, with all five models selected and units set to millimetres. The original synthetic drawing and generated DXF remain in ignored `outputs/`.
 
 See [website_design.md](website_design.md) for the design brief.
+
+## Code signing policy
+
+`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. Both state that v0.1.3 is unsigned and SignPath is being explored; do not add an active sponsorship claim before approval and activation. Update both pages and the download notice when a signed release becomes available.

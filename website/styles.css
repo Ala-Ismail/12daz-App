@@ -584,6 +584,45 @@ details a {
   font-size: 10px;
   color: #969faf;
 }
+.signing-note {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 12px;
+}
+.signing-note a,
+.policy-page a:not(.button) {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.policy-page {
+  max-width: 800px;
+  padding-block: 65px;
+}
+.policy-page h1 {
+  font-size: clamp(36px, 5vw, 56px);
+  letter-spacing: -1.5px;
+}
+.policy-intro {
+  font-size: 18px;
+}
+.policy-page section {
+  margin-top: 36px;
+}
+.policy-page h2 {
+  margin-bottom: 14px;
+  font-size: 24px;
+  line-height: 1.3;
+}
+.policy-page section p + p {
+  margin-top: 15px;
+}
+.policy-page > .button {
+  margin-top: 36px;
+}
+.footer-top nav {
+  flex-wrap: wrap;
+}
 .cuppa-section {
   padding-bottom: 80px;
 }

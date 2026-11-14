@@ -243,10 +243,83 @@ A first release is complete when the supported sample geometry converts correctl
 
 ## Future enhancements
 
+- **Optional source-Z preservation:** feasible as a staged enhancement; see the assessment below. The implemented default remains flattened 2D DXF.
 - **DWG output:** introduce a separate writer/conversion adapter after DXF reliability is established. Evaluate ODA Drawings SDK or a supported converter and review redistribution terms. Do not rename a DXF file to `.dwg`. [ODA Drawings SDK](https://www.opendesign.com/products/drawings), [ODA File Converter](https://www.opendesign.com/GUESTFILES/ODA_FILE_CONVERTER).
 - Batch conversion, saved model/layer presets and additional DXF versions.
 - Expanded alignment, symbol and style support; optional contour generation.
 - Rust acceleration only where benchmarks justify the integration and maintenance cost.
+
+## Feasibility: optional Keep Z / 3D DXF export
+
+Assessment date: 15 November 2026. **Feasible for supported geometry, with moderate cross-cutting implementation work.** The current Python/Tk/ezdxf architecture can support an explicit elevation-preserving mode without a new repository or CAD installation. This is a proposal, not an implemented feature or a promise of full 3D 12d compatibility. Arbitrary spatial curves and vertical alignment reconstruction need additional format research and qualification.
+
+### Current behaviour and where Z is lost
+
+- `src/az12_converter/geometry.py`: `Primitive.points` holds XY pairs. Vertex conversion checks non-null Z values but discards them. Standalone circles/arcs and text are also reduced to XY. Closure, duplicate detection and collapse-to-point decisions currently compare XY only, so a vertical line can collapse to a point.
+- `src/az12_converter/export/dxf.py`: `DxfWriter` writes points, circle centres and text placement at Z = 0 and uses planar `LWPOLYLINE` entities for strings. `validate_dxf` deliberately rejects nonzero output Z/elevation and nonstandard extrusion.
+- `src/az12_converter/service.py`: `Options` has no dimensional mode. Inspect, geometry conversion, reports and export validation must share the chosen mode. `worker.py` already transports options as a dictionary, so the process architecture can remain.
+- Super-alignments currently use solved horizontal geometry and explicitly omit vertical design. Keeping Z on ordinary strings cannot recover an omitted alignment profile or source metadata.
+
+Changing only the writer would be insufficient: the source elevations have already been discarded before writing.
+
+### Proposed user controls
+
+Add an **Output geometry** selector in the DXF export panel:
+
+- **2D — flatten Z to zero**: existing behaviour and default.
+- **3D — keep source Z**: preserve known source XYZ for the geometry supported by this mode.
+
+Use an explicit CLI option, proposed as `--geometry-mode flatten-2d|keep-z`, with `flatten-2d` as the default. Choose a default `_3D.dxf` filename in Keep Z mode and `_2D.dxf` in flatten mode without silently replacing a user-chosen destination. Display the selected mode in export summaries and conversion reports.
+
+The initial preview can remain an XY plan projection, labelled **Plan preview — source Z retained in export** in Keep Z mode. It must not claim to be an interactive 3D viewer. Display model Z ranges and missing-Z counts; mode changes must invalidate cached preview/export results and rebuild mode-dependent eligibility and diagnostics through the worker.
+
+### DXF entity strategy
+
+| Source case | Proposed Keep Z representation | Boundary or risk |
+| --- | --- | --- |
+| Point with known XYZ | DXF `POINT` at original XYZ | Preserve vertically stacked points with identical XY. |
+| Straight string with changing Z | DXF 3D `POLYLINE` with XYZ vertices, or `LINE` for deliberately split segments | Preserve closure and colour splitting; compare XYZ for duplicate/collapse checks. |
+| Horizontal string at one known elevation, including circular segments | `LWPOLYLINE` with XY/bulges and its constant elevation | A planar lightweight polyline cannot hold a different Z for each vertex. |
+| Horizontal circle or arc with verified constant Z | `CIRCLE`/`ARC` with elevation, or elevated bulged polyline | Check centre/end Z consistency and preserve sweep/direction. |
+| Supported basic horizontal text | `TEXT` with source Z at insertion/alignment points | Existing font/placement restrictions remain; no implied support for tilted or offset text. |
+| Circular plan segment whose endpoint elevations differ | Initially skip the source object with a specific diagnostic | A 3D polyline has straight segments; copying a bulge cannot encode an exact rising circular-plan curve. |
+| Tilted planar circle/arc | Defer until plane/orientation data is parsed and verified | Requires correct object coordinate system (OCS), normal and world coordinate system (WCS) transforms. |
+| Super-alignment requiring a vertical profile | Defer or skip in Keep Z mode unless verified source elevations are available | Do not label horizontal-only geometry as preserved 3D. |
+| TIN, mesh, drainage and other currently unsupported objects | Remain unsupported | Keeping Z is an elevation-preservation feature, not solid/surface or civil-model reconstruction. |
+
+This entity strategy is an engineering proposal based on the current converter and ezdxf capabilities. The library documents [planar LWPOLYLINE and its elevation](https://ezdxf.readthedocs.io/en/stable/tutorials/lwpolyline.html), [3D polyline creation](https://ezdxf.readthedocs.io/en/stable/dxfentities/polyline.html), and [OCS/WCS handling for oriented entities](https://ezdxf.readthedocs.io/en/stable/tutorials/ocs_usage.html). The linked stable documentation may describe a newer library release; verify APIs against the pinned 1.3.5 dependency before implementation.
+
+**Rising curves need a separate policy.** A circular XY path with varying Z need not be a planar circular arc in 3D. Equal endpoint elevations alone do not prove a constant elevation along a segment if source vertical controls exist. Do not silently flatten it, replace it with one chord, or invent a vertical profile. A later, explicitly enabled approximation may sample XY curves with a verified Z law and stated horizontal/vertical tolerances, recording the approximation and entity counts. Straight interpolation of Z is acceptable only when supported by the source definition or explicitly disclosed as an assumption; it must not be called exact preservation.
+
+### Missing elevations and numeric rules
+
+Preserve known XYZ without rescaling or changing the vertical datum. Retain null/missing elevations distinctly from numeric zero and from the archive's configured null sentinel. Validate the grammar for object-level elevations and genuinely 2D source objects before assigning any default Z.
+
+For the initial Keep Z mode, skip a whole object with unresolved required elevations and a clear diagnostic, rather than inventing zero or joining across missing vertices. Any future fallback-to-zero or interpolation must be an explicit option with warnings and report counts. Reject malformed/non-finite coordinates. Use documented coordinate tolerances for coplanarity and duplicate checks without rounding or snapping valid source elevations. Distinct XYZ points at the same XY must remain distinct, including vertical segments and closing edges.
+
+### Implementation stages and effort
+
+1. **Retain source XYZ.** Extend the internal geometry representation, preserve missing-Z state and source elevation provenance, and keep XY curve calculations separate from spatial coordinates. Audit every constructor and per-segment colour split so none loses Z. Cover closure, degeneracy, negative elevations and stacked points.
+2. **Add the bounded Keep Z writer.** Support known-Z points, straight 3D strings and verified horizontal constant-elevation curves/basic text. Introduce the shared geometry-mode option and explicit unsupported/missing-Z policies. Preserve the existing 2D path.
+3. **Integrate GUI, CLI and reports.** Carry the mode through inspect/preview/export and worker options. Update preview labels, default filenames, offline help and packaged-app smoke checks. Report chosen mode, XYZ bounds, missing-Z objects, approximation policy and skips, with source references.
+4. **Validate by mode.** Retain strict zero-Z checks for flattened output. For Keep Z, reopen and inspect entity-specific WCS positions, including every 3D polyline vertex, elevated lightweight polyline vertices and text alignment points; verify expected XYZ against source-derived evidence and geometry tolerances. An audit or nonzero Z alone does not prove fidelity. Keep atomic publication, overwrite protection and cancellation guarantees.
+5. **Qualify and then expand.** Independently compare representative files in CAD before claiming production-ready 3D support. Research rising/tilted curves and vertical alignments separately; add them only with verified source semantics and dedicated tests.
+
+Relative effort: straight known-Z points/strings and horizontal elevated entities are the practical first increment; null-Z handling and mode-aware validation are essential parts of it. Rising curves, tilted geometry and vertical alignments are substantially more complex. No delivery-duration estimate is established by this assessment.
+
+### Required acceptance evidence
+
+- Existing flatten-mode geometry checks still pass: unchanged supported XY geometry, exact supported plan arcs and all exported Z values zero.
+- Keep Z fixtures cover positive/negative/zero elevations, large survey coordinates, per-vertex Z, same-XY/different-Z points, vertical lines, closed strings, segment colours, missing/null Z and non-finite rejection.
+- Constant-elevation circles and bulged strings preserve elevation, radius, direction and endpoints. Differing-Z curves and unqualified alignments are explicitly reported and skipped under the initial policy.
+- Round-trip DXF assertions inspect WCS geometry, 3D vertices and text placement, not just entity counts or audit success. Include units-without-rescaling, worker mode changes, cancellation, overwrite and packaged GUI/CLI cases.
+- Independent CAD inspection confirms elevations, connectivity and curve representation against known reference geometry. Document memory/output-size impact before introducing curve sampling.
+
+### Feasibility spike performed
+
+A temporary writer-only check using the installed **ezdxf 1.3.5** created and reopened an R2018 DXF containing an XYZ point, a varying-Z 3D polyline, an elevated bulged lightweight polyline, a circle and text at nonzero Z. Their expected coordinates/elevation/bulge survived round-trip, and the audit reported no errors or fixes. The temporary file was removed when the check completed.
+
+This establishes availability of the basic writer APIs in the pinned dependency. It does **not** test a Keep Z converter path, source-Z interpretation, rising curves, CAD interoperability or clean-machine distribution. No application or website behaviour changes as part of this feasibility documentation.
 
 ## GUI concept provenance
 

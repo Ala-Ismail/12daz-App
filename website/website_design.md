@@ -109,7 +109,11 @@ At the bottom of the page, after the FAQ and before the footer, show an actual s
 
 ### 10. Footer
 
-Link to GitHub, release notes, issues and the MIT license. Include the exact notice:
+Link to GitHub, release notes, issues and the MIT license.
+
+Also link **Code signing policy** to `code-signing-policy.html` from the footer and download section. The policy page explains current signing status, team responsibilities and privacy. State that v0.1.3 is unsigned and SignPath is under exploration; update that status only when evidence supports it. Keep the public page aligned with `docs/code_signing_policy.md`.
+
+Include the exact notice:
 
 Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160.
 
@@ -122,6 +126,7 @@ website/
   README.md
   website_design.md
   index.html
+  code-signing-policy.html
   styles.css
   assets/
     favicon.svg

@@ -125,10 +125,132 @@ jobs:
             build/12daz-converter/warn-12daz-converter.txt
           if-no-files-found: ignore
 
+  sign:
+    name: Sign verified Windows release
+    needs: windows
+    if: >-
+      vars.SIGNING_ENABLED == 'true' &&
+      needs.windows.outputs.release_tag != '' &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: windows-latest
+    timeout-minutes: 20
+    environment: release-signing
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      AZURE_CORE_OUTPUT: none
+    steps:
+      - name: Validate signing configuration
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT_NAME: ${{ vars.SIGNING_ACCOUNT_NAME }}
+          SIGNING_CERTIFICATE_PROFILE: ${{ vars.SIGNING_CERTIFICATE_PROFILE }}
+          SIGNING_PUBLISHER: ${{ vars.SIGNING_PUBLISHER }}
+        run: |
+          $required = @('AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'SIGNING_ENDPOINT', 'SIGNING_ACCOUNT_NAME', 'SIGNING_CERTIFICATE_PROFILE', 'SIGNING_PUBLISHER')
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing signing variable: $name. See docs/code_signing.md."
+            }
+          }
+          $endpoint = [Uri]$env:SIGNING_ENDPOINT
+          if ($endpoint.Scheme -ne 'https' -or -not $endpoint.Host.EndsWith('.codesigning.azure.net')) {
+            throw 'Use the HTTPS endpoint shown in your Azure Artifact Signing account.'
+          }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.package_name }}
+          path: package
+      - name: Verify and extract unsigned package
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
+        run: |
+          $archive = Join-Path $PWD "package/$env:PACKAGE_NAME.zip"
+          $expectedLine = Get-Content -LiteralPath 'package/SHA256SUMS.txt' -Raw
+          $expectedHash = ($expectedLine.Trim() -split '\s+')[0]
+          if ($expectedHash -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expectedHash) {
+            throw 'Unsigned package checksum verification failed'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath unsigned
+      - name: Authenticate to Azure using GitHub OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign application executable and timestamp
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.SIGNING_CERTIFICATE_PROFILE }}
+          files: ${{ github.workspace }}\unsigned\12dAZ-Converter-${{ needs.windows.outputs.version }}\12dAZ-Converter.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          cache-dependencies: false
+          exclude-environment-credential: true
+          exclude-azure-cli-credential: false
+      - name: Verify signed executable and create final package
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ needs.windows.outputs.version }}
+          PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
+          SIGNING_PUBLISHER: ${{ vars.SIGNING_PUBLISHER }}
+        run: |
+          $folder = Join-Path $PWD "unsigned/12dAZ-Converter-$env:PACKAGE_VERSION"
+          $executable = Join-Path $folder '12dAZ-Converter.exe'
+          $signature = Get-AuthenticodeSignature -LiteralPath $executable
+          if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or -not $signature.TimeStamperCertificate) {
+            throw 'A valid trusted Authenticode signature and timestamp are required'
+          }
+          $publisher = $signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          if ($publisher -cne $env:SIGNING_PUBLISHER) { throw 'Signing certificate publisher does not match SIGNING_PUBLISHER' }
+          $report = Join-Path $PWD 'signed-smoke.json'
+          $smoke = Start-Process -FilePath $executable -ArgumentList @('--smoke-test', "`"$report`"") -WindowStyle Hidden -PassThru
+          $processHandle = $smoke.Handle
+          if (-not $smoke.WaitForExit(60000)) { throw 'Signed application smoke test timed out' }
+          if ($smoke.ExitCode -ne 0) { throw "Signed application smoke test failed: $($smoke.ExitCode)" }
+          $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.application_version -ne $env:PACKAGE_VERSION) {
+            throw 'Signed application smoke result failed or reported the wrong version'
+          }
+          $archive = Join-Path $PWD "package/$env:PACKAGE_NAME.zip"
+          Compress-Archive -LiteralPath $folder -DestinationPath $archive -Force
+          Expand-Archive -LiteralPath $archive -DestinationPath roundtrip
+          $packagedExe = Join-Path $PWD "roundtrip/12dAZ-Converter-$env:PACKAGE_VERSION/12dAZ-Converter.exe"
+          if ((Get-FileHash -LiteralPath $packagedExe -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash) {
+            throw 'Final ZIP did not preserve the signed executable'
+          }
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText((Join-Path $PWD 'package/SHA256SUMS.txt'), "$hash  $env:PACKAGE_NAME.zip`n", [Text.Encoding]::ASCII)
+          "Trusted signature verified for $publisher; signed executable smoke test and final ZIP verification passed." >> $env:GITHUB_STEP_SUMMARY
+      - name: Upload signed release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.package_name }}-signed
+          path: |
+            package/${{ needs.windows.outputs.package_name }}.zip
+            package/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
   release:
     name: Prepare draft pre-release
-    needs: windows
-    if: needs.windows.outputs.release_tag != '' && github.event_name != 'pull_request'
+    needs: [windows, sign]
+    if: >-
+      always() && !cancelled() && needs.windows.result == 'success' &&
+      needs.windows.outputs.release_tag != '' && github.event_name != 'pull_request' &&
+      ((vars.SIGNING_ENABLED == 'true' && needs.sign.result == 'success') ||
+       (vars.SIGNING_ENABLED != 'true' && needs.sign.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -137,7 +259,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.windows.outputs.package_name }}
+          name: ${{ format('{0}{1}', needs.windows.outputs.package_name, needs.sign.result == 'success' && '-signed' || '') }}
           path: package
       - name: Verify download checksum
         working-directory: package
@@ -150,6 +272,7 @@ jobs:
           RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
           PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
           PUBLISH_RELEASE: ${{ inputs.publish_release && 'true' || 'false' }}
+          SIGNED_PACKAGE: ${{ needs.sign.result == 'success' && 'true' || 'false' }}
         run: |
           set -euo pipefail
           asset="package/$PACKAGE_NAME.zip"
@@ -164,7 +287,16 @@ jobs:
           This is a preview build. Unsupported objects, omitted metadata/labels and style substitutions are reported. Independent CAD and clean-machine release qualification remain pending. Review conversion reports before using exported drawings.
 
           The package passed automated tests and the packaged application smoke test in GitHub Actions. SHA256SUMS.txt contains its checksum.
+
+          [Code signing policy](https://github.com/Ala-Ismail/12daz-App/blob/main/docs/code_signing_policy.md).
           NOTES
+          if [[ "$SIGNED_PACKAGE" == "true" ]]; then
+            echo '' >> release-notes.md
+            echo 'The application executable has a verified, timestamped publisher signature. New releases can still receive Microsoft Defender SmartScreen reputation warnings.' >> release-notes.md
+          else
+            echo '' >> release-notes.md
+            echo 'This build is unsigned. Windows may show an unknown-publisher or Microsoft Defender SmartScreen warning.' >> release-notes.md
+          fi
           if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > release-state.txt 2> release-error.txt; then
             if [[ "$(cat release-state.txt)" != "true" ]]; then
               echo "::notice::This release is already published; its assets were left unchanged. The new build is available as an Actions artifact."
@@ -172,6 +304,7 @@ jobs:
               exit 0
             fi
             gh release upload "$RELEASE_TAG" "$asset" "$sums" --clobber
+            gh release edit "$RELEASE_TAG" --notes-file release-notes.md
           else
             gh release create "$RELEASE_TAG" "$asset" "$sums" --verify-tag --draft --prerelease --title "12dAZ Converter $RELEASE_TAG" --notes-file release-notes.md
           fi

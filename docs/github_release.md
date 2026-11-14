@@ -42,6 +42,10 @@ Pushing the tag runs the workflow and prepares the draft automatically. The file
 
 ## Permissions and failure behaviour
 
+Optional Public Trust publisher signing is prepared in the separate `sign` job. Complete the Azure account, organization identity validation, OIDC and GitHub variables described in [code signing setup](code_signing.md), then enable `SIGNING_ENABLED`. Once enabled, signature or timestamp failures block publication. Signing happens before the final distribution ZIP and checksum are regenerated. Existing published assets remain unchanged; a new version/tag is needed for a signed public release.
+
+The public [Code signing policy](code_signing_policy.md) records current unsigned status and the proposed SignPath responsibilities. SignPath is under exploration; no application or active integration is claimed. Include this policy link in release notes and identify each build's actual signing status.
+
 The build job uses read-only repository access. The release job uses GitHub's provided `GITHUB_TOKEN` with `contents: write`; no personal token needs to be added. Repository or organisation policy must allow that workflow permission.
 
 Release preparation runs only after tests, packaging, packaged-app verification and checksum verification succeed. Ordinary tag builds leave drafts; the explicit publish option or release-specific workflow publishes after those checks. Neither workflow moves tags or replaces published assets. Build failures appear in Actions, with available packaging diagnostics attached.
