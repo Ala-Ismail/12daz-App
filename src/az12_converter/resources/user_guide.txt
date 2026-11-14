@@ -30,3 +30,6 @@ Help and ownership
 Help > About shows the installed version/build and copyright notice. Help > License and Third-party Notices opens the bundled licenses offline.
 
 Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160
+
+Startup and optional support
+The splash closes automatically after about 1.8 seconds; choose Continue, Enter or Escape to skip it. Buy us a coffee (PayPal) opens https://paypal.me/12dazapp in your browser only when clicked. The same optional support link is in Help > About. The converter remains free and MIT licensed and does not process payments. CLI, background workers and packaged smoke tests do not display the startup splash.

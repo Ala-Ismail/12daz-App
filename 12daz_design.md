@@ -44,6 +44,10 @@ These observations validate this sample's container and encoding, not universal 
 
 Use the published archive grammar rather than inferring syntax solely from examples. The vendor documentation describes archive versions, commands, attributes and string types: [12d documentation](https://www.12d.com/learningtools/12d_Documentation.html) and [V15 archive specification](https://downloads.12dmodel.com/v15/12d_Model_15_C1e/12d_a_File_Format_V15_C1e.pdf). Autodesk also describes `.12daz` as zipped `.12da`: [12d extension release notes](https://up1.autodesk.com/2022/CIV3D/Autodesk_12d_Extension_2022_ReleaseNotes.htm).
 
+## Startup and optional support in version 0.1.3
+
+Normal desktop startup shows a brief dark grey splash that closes automatically after about 1.8 seconds. Continue, Enter and Escape skip it. CLI, worker and smoke-test paths do not show the startup screen. The splash and Help > About offer a voluntary Buy us a coffee (PayPal) button linking to https://paypal.me/12dazapp. The README includes the same link. Payment pages open in the browser only when clicked; the converter remains free, MIT licensed and does not process payments.
+
 ## Current implemented GUI
 
 Version 0.1.2 keeps the proposal's three-panel layout and uses the requested dark grey theme with blue actions. The original concept below remains a reference. Unsupported settings, including curve tolerance, are not exposed as functioning controls.

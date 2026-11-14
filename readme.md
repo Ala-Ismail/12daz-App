@@ -2,7 +2,7 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable 2D DXF 2018**. Preserves source XY coordinates and supported circular arcs, flattens Z to zero and writes one layer per model. No 12d Model or AutoCAD installation is needed.
 
-Version **0.1.2** is an initial working implementation. Independent CAD comparison and clean-machine release qualification remain pending. Read the conversion report: unsupported geometry, omitted labels/metadata and style substitutions are explicitly reported. DWG remains future work.
+Version **0.1.3** is an initial working implementation. Independent CAD comparison and clean-machine release qualification remain pending. Read the conversion report: unsupported geometry, omitted labels/metadata and style substitutions are explicitly reported. DWG remains future work.
 
 ![12dAZ Converter dark grey desktop interface](docs/assets/12daz-converter-gui-v0.1.2.png)
 
@@ -10,14 +10,14 @@ Version **0.1.2** is an initial working implementation. Independent CAD comparis
 
 ## Run the Windows application
 
-The local build is `dist/12dAZ-Converter-0.1.2/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.2-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
+The local build is `dist/12dAZ-Converter-0.1.3/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.3-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
 
 1. Open a `.12daz` or `.12da` file.
 2. Review models and preview; select the models to export.
 3. Choose drawing units and a `.dxf` destination. Declaring units does not rescale coordinates.
 4. Select **Export DXF** and review warnings in **View report**. A `.dxf.conversion.json` report is saved beside the drawing.
 
-**Help** provides an offline User Guide, About dialog, MIT license and dependency notices. Cancel requests safe cleanup before output publication.
+**Help** provides an offline User Guide, About dialog, MIT license and dependency notices. A brief startup splash includes optional support through PayPal; it closes automatically after about 1.8 seconds, or immediately with Continue, Enter or Escape. Help > About contains the same support link. Cancel requests safe cleanup before output publication.
 
 ## Run from source
 
@@ -63,7 +63,7 @@ The test suite uses Python's standard `unittest`, synthetic fixtures and withdra
 To smoke-test a built executable without showing its main window:
 
 ```powershell
-& .\dist\12dAZ-Converter-0.1.2\12dAZ-Converter.exe --smoke-test "$PWD\outputs\packaged-smoke.json"
+& .\dist\12dAZ-Converter-0.1.3\12dAZ-Converter.exe --smoke-test "$PWD\outputs\packaged-smoke.json"
 ```
 
 Create the report's parent directory first. This check runs Tk startup, spawned scanning/export, DXF audit and offline Help/About resources on synthetic data. It does not replace clean-machine qualification.
@@ -86,6 +86,12 @@ See [GitHub build and release steps](docs/github_release.md) for details.
 - [Project agent guidance](.agent).
 
 Private input belongs in ignored `sample/`; generated drawings and local reports belong in ignored `outputs/`. The GUI concept image contains illustrative data and predates the implemented Help menu and Tk controls.
+
+## Support development
+
+12dAZ Converter is free and open source. If you find it useful, [buy us a coffee via PayPal](https://paypal.me/12dazapp) to support ongoing development and maintenance.
+
+Support is entirely optional. The same link is available on the startup splash screen and in **Help > About**. It opens your browser only when clicked; the converter does not process payments.
 
 ## License
 
