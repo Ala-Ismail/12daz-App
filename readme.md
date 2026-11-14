@@ -64,6 +64,14 @@ To smoke-test a built executable without showing its main window:
 
 Create the report's parent directory first. This check runs Tk startup, spawned scanning/export, DXF audit and offline Help/About resources on synthetic data. It does not replace clean-machine qualification.
 
+## GitHub builds and releases
+
+Push to `main` to build the Windows package in GitHub Actions. Download the ZIP and checksum from the successful run's **Artifacts** section.
+
+Push a matching version tag to prepare a **draft pre-release** automatically. For the existing `v0.1.2` tag, run **Actions > Build and release > Run workflow** on `main` and enter `v0.1.2` in `release_tag`. Review and publish the resulting draft from **Releases**. Existing published releases are preserved.
+
+See [GitHub build and release steps](docs/github_release.md) for details.
+
 ## Project documents
 
 - [Design and original GUI concept](12daz_design.md).
