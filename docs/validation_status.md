@@ -1,4 +1,4 @@
-# Validation status — 0.1.0
+# Validation status - 0.1.3
 
 Date: 14 November 2026. This is an initial working build, not a fully qualified release. Results below distinguish executable tests from the broader acceptance cases in [test_requirements.md](test_requirements.md).
 
@@ -18,7 +18,7 @@ Tk/ttk replaces the proposed PySide6 GUI. The development environment blocked pa
 
 Command: `python scripts/test.py`, using Python 3.11.5, ezdxf 1.3.5, Tk 8.6 and Windows x64.
 
-**69 tests pass.** See [test_core.py](../tests/test_core.py) and [test_gui.py](../tests/test_gui.py). They use synthetic data authored for this project. Method names reference acceptance case IDs; a passing method may cover only part of a multi-scenario acceptance case.
+**77 tests pass.** See [test_core.py](../tests/test_core.py) and [test_gui.py](../tests/test_gui.py). They use synthetic data authored for this project. Method names reference acceptance case IDs; a passing method may cover only part of a multi-scenario acceptance case.
 
 | Group | Evidence executed | Remaining qualification |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ This ran on the development machine, which has Python installed. It demonstrates
 
 DWG, TIN/mesh export, drainage plan representations, transition approximation, custom symbols, rendered labels, external style definitions, paper/screen-size text and text offset/raise placement remain unsupported or deferred. Unsupported curves are reported rather than replaced by false straight segments. Drag-and-drop input is not implemented. The GUI excludes unsupported-only models by default; CLI inspection reports all source objects.
 
-Complete the remaining applicable checks above, independently review reference drawings and meet the release gates before calling this a qualified release. The 69 passing executable tests do not imply all 59 acceptance-case rows have passed in full.
+Complete the remaining applicable checks above, independently review reference drawings and meet the release gates before calling this a qualified release. The 77 passing executable tests do not imply all 59 acceptance-case rows have passed in full.
 
 ## Preview correction in 0.1.1
 
@@ -96,3 +96,11 @@ The current [GUI screenshot](assets/12daz-converter-gui-v0.1.2.png) was captured
 Model selection changes now trigger a debounced background inspection restricted to selected models. The entire 30,000-point display allowance is shared among those selected models. The previous preview remains available during regeneration, stale worker results are ignored, and only the latest selection is applied. The full model inventory remains intact. Export still uses full supported geometry, independently of preview sampling.
 
 On the supplied private sample, selecting only RD 11 DES STR increases its retained preview from 1,875 to 30,000 points while preserving all 17 models in the inventory. Local evidence is `outputs/selected-preview-validation.json`. Four additional tests cover full allowance recovery, rapid selection changes during a refresh, resetting zoom to fitted extents, and opening new input while a preview refresh is pending. The complete suite now passes 69 tests.
+
+## Startup splash and optional support in 0.1.3
+
+A dark grey startup splash now appears on normal GUI launch. It closes automatically after about 1.8 seconds and can be skipped with Continue, Enter or Escape. Background conversion workers, CLI commands and packaged smoke tests do not display it. The hidden smoke test constructs and dismisses a splash to verify its bundled code.
+
+The splash, Help > About and the README all use the owner's supplied public support URL: https://paypal.me/12dazapp. The buttons explicitly identify PayPal. Support remains optional; conversion stays free and no browser or payment page opens automatically. No payment processing is embedded in the app.
+
+The full local suite passed 77 tests. Focused support tests also passed after wiring the final URL, and the frozen v0.1.3 executable passed the expanded smoke test covering splash dismissal, spawned conversion, DXF audit, offline help and an enabled support button without opening a browser. Local evidence is outputs/packaged-smoke-0.1.3.json. The splash was also visually inspected. Published v0.1.2 artifacts are unchanged; v0.1.3 is a new build.

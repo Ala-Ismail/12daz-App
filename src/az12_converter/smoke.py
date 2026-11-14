@@ -7,6 +7,8 @@ import tkinter as tk
 
 from . import COPYRIGHT, __version__
 from .app import ConverterApp, resource_text
+from .splash import StartupSplash
+from .support import support_url
 
 
 def run_smoke(report_path):
@@ -15,6 +17,10 @@ def run_smoke(report_path):
     app = ConverterApp(root)
     result = {"application_version": __version__, "passed": False}
     try:
+        splash = StartupSplash(root, lambda: None, duration_ms=0, show=False)
+        root.update()
+        if not splash.dismissed:
+            raise RuntimeError('Startup splash did not dismiss.')
         with tempfile.TemporaryDirectory(prefix='12daz-smoke-') as directory:
             source = Path(directory) / 'test.12da'
             source.write_text('// archive_version "15.1"\nmodel "Smoke" string super {breakline line data_3d {0 0 9 10 0 11} radius_data {-10} major_data {f}}', encoding='utf-8')
@@ -43,10 +49,12 @@ def run_smoke(report_path):
                 dialog = method()
                 dialog.withdraw()
                 root.update()
+                if hasattr(dialog, 'support_button') and support_url() and dialog.support_button.instate(['disabled']):
+                    raise RuntimeError('Configured support link is disabled in About.')
                 dialog.destroy()
             if COPYRIGHT not in resource_text('LICENSE.txt'):
                 raise RuntimeError('Bundled license copyright mismatch.')
-            result.update(passed=True, checks=['Tk startup', 'spawned archive scan', 'spawned DXF export and audit', 'offline Help/About/license resources'], emitted_entities=1)
+            result.update(passed=True, checks=['Tk startup and splash dismissal', 'spawned archive scan', 'spawned DXF export and audit', 'offline Help/About/license resources', 'configured support button without opening a browser'], emitted_entities=1)
     except Exception as exc:
         result['error'] = str(exc)
     finally:

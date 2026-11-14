@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Build an offline standalone Windows x64 converter from 12daz/12da to editable 2D DXF. Version 0.1.2 implements scanning, supported 2D DXF conversion and a desktop GUI. See docs/validation_status.md for measured evidence and pending release checks. Do not describe unverified cases as passed.
+Build an offline standalone Windows x64 converter from 12daz/12da to editable 2D DXF. Version 0.1.3 implements scanning, supported 2D DXF conversion and a desktop GUI. See docs/validation_status.md for measured evidence and pending release checks. Do not describe unverified cases as passed.
 
 ## Source of truth
 
@@ -36,6 +36,10 @@ Preserve the dark grey theme, blue primary actions and three-panel layout. Share
 ## GUI help
 
 Implement a Help menu with bundled offline User Guide, About, and License and Third-party Notices. About must show the installed version/build and the exact notice: Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160. Keep notices consistent with LICENSE and test UI-07/UI-08.
+
+## Optional support
+
+Use only the owner-supplied public support URL, https://paypal.me/12dazapp. Support is optional. Show the brief dismissible splash only for normal GUI startup; never open the browser automatically or show the splash in CLI/worker/smoke-test paths. Keep the same link in Help > About and the README.
 
 ## License
 

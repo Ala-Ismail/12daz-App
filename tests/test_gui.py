@@ -180,6 +180,15 @@ class GuiTests(unittest.TestCase):
         self.app.show_guide().destroy()
         self.app.show_licenses().destroy()
 
+    def test_UI07_about_support_link(self):
+        from az12_converter import support
+        with patch.object(support, 'SUPPORT_URL', 'https://example.com/support'), patch.object(support, 'open_support') as opened:
+            dialog = self.app.show_about()
+            self.assertTrue(dialog.support_button.instate(['!disabled']))
+            dialog.support_button.invoke()
+            opened.assert_called_once_with(dialog)
+            dialog.destroy()
+
     def test_CL01_gui_worker_matches_core_conversion(self):
         self.load()
         self.app.units.set('metres')

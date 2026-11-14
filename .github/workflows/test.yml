@@ -1,24 +1,183 @@
-name: Test and package
-on: [push, pull_request, workflow_dispatch]
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing tag to build and prepare as a draft release (e.g. v0.1.2). Leave blank for a build only.'
+        required: false
+        default: ''
+        type: string
+      publish_release:
+        description: 'Publish the verified pre-release instead of leaving it as a draft.'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      publish_release:
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   windows:
+    name: Test, build and verify Windows package
     runs-on: windows-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      package_name: ${{ steps.package.outputs.package_name }}
+      release_tag: ${{ steps.package.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install -r requirements-build.txt
-      - run: python scripts/test.py
-      - run: python scripts/build.py
-      - shell: pwsh
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: Validate version and tag
+        id: package
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+        run: |
+          @'
+          import os, re, runpy, tomllib
+          from pathlib import Path
+          version = runpy.run_path('src/az12_converter/__init__.py')['__version__']
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+              raise SystemExit('Expected numeric major.minor.patch version')
+          project = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8-sig'))
+          if project['project']['version'] != version:
+              raise SystemExit('pyproject.toml and application versions disagree')
+          tag = os.environ.get('RELEASE_TAG', '')
+          if tag and tag != f'v{version}':
+              raise SystemExit(f'Tag {tag!r} must match application version v{version}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'version={version}\npackage_name=12dAZ-Converter-{version}-Windows-x64\nrelease_tag={tag}\n')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Version validation failed' }
+      - name: Install pinned build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Run automated tests
+        run: python scripts/test.py
+      - name: Build portable Windows package
+        run: python scripts/build.py
+      - name: Verify packaged application
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path outputs -Force | Out-Null
-          $smoke = Start-Process -FilePath "$PWD/dist/12dAZ-Converter-0.1.2/12dAZ-Converter.exe" -ArgumentList @('--smoke-test', "$PWD/outputs/packaged-smoke.json") -WindowStyle Hidden -PassThru
+          $executable = Join-Path $PWD "dist/12dAZ-Converter-$env:PACKAGE_VERSION/12dAZ-Converter.exe"
+          $report = Join-Path $PWD 'outputs/packaged-smoke.json'
+          $smoke = Start-Process -FilePath $executable -ArgumentList @('--smoke-test', "`"$report`"") -WindowStyle Hidden -PassThru
+          $processHandle = $smoke.Handle
           if (-not $smoke.WaitForExit(60000)) { throw 'Packaged smoke test timed out' }
-          if ($smoke.ExitCode -ne 0) { throw 'Packaged smoke test failed' }
-          if (-not (Get-Content outputs/packaged-smoke.json -Raw | ConvertFrom-Json).passed) { throw 'Smoke result did not pass' }
-      - uses: actions/upload-artifact@v4
+          if ($smoke.ExitCode -ne 0) { throw "Packaged smoke test failed with exit code $($smoke.ExitCode)" }
+          $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.application_version -ne $env:PACKAGE_VERSION) {
+            throw 'Packaged smoke result failed or reported the wrong version'
+          }
+      - name: Create package checksum
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
+        run: |
+          $archive = Join-Path $PWD "dist/$env:PACKAGE_NAME.zip"
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText((Join-Path $PWD 'dist/SHA256SUMS.txt'), "$hash  $env:PACKAGE_NAME.zip`n", [Text.Encoding]::ASCII)
+      - name: Upload downloadable package
+        uses: actions/upload-artifact@v4
         with:
-          name: 12dAZ-Converter-Windows-x64
-          path: dist/12dAZ-Converter-0.1.2-Windows-x64.zip
+          name: ${{ steps.package.outputs.package_name }}
+          path: |
+            dist/${{ steps.package.outputs.package_name }}.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-diagnostics-${{ github.run_id }}
+          path: |
+            outputs/packaged-smoke.json
+            build/12daz-converter/warn-12daz-converter.txt
+          if-no-files-found: ignore
+
+  release:
+    name: Prepare draft pre-release
+    needs: windows
+    if: needs.windows.outputs.release_tag != '' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.package_name }}
+          path: package
+      - name: Verify download checksum
+        working-directory: package
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Create or refresh draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+          PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          asset="package/$PACKAGE_NAME.zip"
+          sums="package/SHA256SUMS.txt"
+          cat > release-notes.md <<'NOTES'
+          Free, MIT-licensed Windows converter from 12daz / 12da to editable 2D DXF.
+
+          Extract the complete Windows ZIP and run 12dAZ-Converter.exe. Keep the _internal folder beside it. Python, AutoCAD and 12d Model are not required on the user's computer.
+
+          Includes model selection, a dark grey GUI, an interactive plan preview, exact supported circular arcs, zero-Z DXF export and conversion reports. The 30,000-point preview allowance is shared across selected models; DXF export uses full supported geometry.
+
+          This is a preview build. Unsupported objects, omitted metadata/labels and style substitutions are reported. Independent CAD and clean-machine release qualification remain pending. Review conversion reports before using exported drawings.
+
+          The package passed automated tests and the packaged application smoke test in GitHub Actions. SHA256SUMS.txt contains its checksum.
+          NOTES
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > release-state.txt 2> release-error.txt; then
+            if [[ "$(cat release-state.txt)" != "true" ]]; then
+              echo "::notice::This release is already published; its assets were left unchanged. The new build is available as an Actions artifact."
+              echo "Existing published release preserved. Download the verified build from this run's artifacts." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            gh release upload "$RELEASE_TAG" "$asset" "$sums" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$asset" "$sums" --verify-tag --draft --prerelease --title "12dAZ Converter $RELEASE_TAG" --notes-file release-notes.md
+          fi
+          if [[ "$PUBLISH_RELEASE" == "true" ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+            echo "Pre-release published for $RELEASE_TAG with the verified Windows ZIP and checksum attached." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Draft pre-release prepared for $RELEASE_TAG. Review it under the repository's Releases page, then publish when ready." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -498,7 +498,7 @@ class ConverterApp:
                 text = f'{length * i / divisions:g}' + (f' {suffix}' if i == divisions else '')
                 c.create_text(x, bottom - 18, text=text, fill='#e7edf6', font=('Segoe UI', 9))
 
-    def text_dialog(self, title, text):
+    def text_dialog(self, title, text, *, show_support=False):
         from .ui_layout import FIELD, BORDER, INK, dark_titlebar
         dialog = tk.Toplevel(self.root)
         dialog.title(title)
@@ -520,7 +520,15 @@ class ConverterApp:
         area.pack(fill="both", expand=True)
         area.insert("1.0", text)
         area.configure(state="disabled")
-        ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=12)
+        footer = ttk.Frame(dialog, padding=(16, 0, 16, 12))
+        footer.pack(fill='x')
+        if show_support:
+            from . import support
+            dialog.support_button = ttk.Button(footer, text='Buy us a coffee (PayPal)',
+                command=lambda: support.open_support(dialog),
+                state='normal' if support.support_url() else 'disabled')
+            dialog.support_button.pack(side='left')
+        ttk.Button(footer, text="Close", command=dialog.destroy).pack(side='right')
         dialog.bind("<Escape>", lambda e: dialog.destroy())
         area.focus_set()
         return dialog
@@ -529,7 +537,12 @@ class ConverterApp:
         return self.text_dialog("User Guide", resource_text("user_guide.txt"))
 
     def show_about(self):
-        return self.text_dialog("About 12dAZ Converter", f"12dAZ Converter\nVersion {__version__} · build {__version__}\n\n12daz / 12da to 2D DXF\nOffline desktop converter\n\n{COPYRIGHT}\n\nLicensed under the MIT License.\n\nSee Help → License and Third-party Notices for the full license and bundled dependency notices.")
+        from . import support
+        link = support.support_url()
+        support_text = f'\n\n{support.COFFEE_MESSAGE}\nSupport is optional.'
+        if link:
+            support_text += f'\n{link}'
+        return self.text_dialog("About 12dAZ Converter", f"12dAZ Converter\nVersion {__version__} · build {__version__}\n\n12daz / 12da to 2D DXF\nOffline desktop converter\n\n{COPYRIGHT}\n\nLicensed under the MIT License.\n\nSee Help → License and Third-party Notices for the full license and bundled dependency notices." + support_text, show_support=True)
 
     def show_licenses(self):
         return self.text_dialog("License and Third-party Notices", resource_text("LICENSE.txt") + "\n\n" + resource_text("THIRD_PARTY_NOTICES.txt"))
@@ -565,9 +578,12 @@ class ConverterApp:
 
 def main():
     mp.freeze_support()
+    from .splash import launch_gui
     root = tk.Tk()
-    ConverterApp(root)
+    splash = launch_gui(root, ConverterApp)
     root.mainloop()
+    if splash.startup_error:
+        raise splash.startup_error
 
 
 if __name__ == "__main__":

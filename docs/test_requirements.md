@@ -16,7 +16,7 @@ Scope: the first release converts `.12daz` and `.12da` to 2D DXF 2018. DWG is ou
 | TR-06 Layers and appearance | Map selected models deterministically, preserve supported styling and disclose substitutions | ST-01 to ST-04 |
 | TR-07 DXF and publication | Produce auditable DXF 2018; validate before publishing; protect existing files through failures and cancellation | DX-01 to DX-07 |
 | TR-08 Accountability | Reconcile every selected source object, report losses and retain source references | RP-01 to RP-04 |
-| TR-09 GUI | Enforce valid states and settings, keep selection consistent with export, remain responsive, and provide offline help with the required copyright | UI-01 to UI-08 |
+| TR-09 GUI | Enforce valid states and settings, keep selection consistent with export, remain responsive, and provide offline help with the required copyright | UI-01 to UI-10 |
 | TR-10 CLI | Match GUI conversion semantics and return documented exit codes | CL-01 to CL-03 |
 | TR-11 Performance | Meet the agreed sample benchmark and resource limits without reducing output fidelity | PF-01 to PF-03 |
 | TR-12 Distribution | Run offline on a clean supported Windows x64 machine without Python, AutoCAD or 12d Model | PK-01 to PK-03 |
@@ -119,6 +119,8 @@ Fixture groups:
 | UI-06 | Export with warnings and inspect report/completion actions | Skips/approximations visible; report and correct output folder open; no false warning-free success |
 | UI-07 | Open Help > About with no input and during conversion; copy notice; close using button and Escape | Application version/build and MIT identification visible; exact notice `Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160` selectable/copyable; no job or option changes; notice wraps without clipping at tested DPI settings |
 | UI-08 | Open Help > User Guide and Help > License and Third-party Notices on offline packaged machine | Bundled guide, full MIT license with the same company/ABN notice, and dependency notices accessible by keyboard and mouse; no network required |
+| UI-09 | Start normal GUI and skip/allow startup splash; invoke CLI, worker and packaged smoke paths | Splash auto-dismisses after about 1.8 seconds; Continue/Enter/Escape bypass it; no visible splash in noninteractive paths; startup errors remain detectable |
+| UI-10 | Open support from splash and About; leave app idle without clicking; inspect README | All support links use https://paypal.me/12dazapp; browser opens only on explicit action; no embedded payments; support remains optional and MIT licensing is unchanged |
 | PF-01 | Benchmark local sample on recorded reference Windows x64 machine | Provisional target: export within 120 seconds and total process-tree peak memory below 2 GiB; counts/fidelity unchanged |
 | PF-02 | Cancel large scan/export and monitor worker/GUI | Acknowledgement within two seconds; UI remains interactive; cleanup time recorded separately; no orphan worker |
 | PF-03 | Load large synthetic input, then repeat load/export/cancel cycle ten times | Preview stays bounded; resource limits respected; no orphan files/processes or growing retained memory after idle cleanup |
