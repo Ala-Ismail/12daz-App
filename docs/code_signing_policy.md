@@ -24,7 +24,7 @@ This is prospective attribution, not a claim of current sponsorship.
 
 External contributions require maintainer review. Each SignPath signing request will require manual approval by the designated approver. Public access, forks and pull requests do not authorize use of this project's signing identity.
 
-Before SignPath activation, the maintainer must enable multi-factor authentication for GitHub and SignPath access and configure release/workflow protections. These are activation requirements, not claims that account protections have already been verified.
+The repository owner has confirmed that multi-factor authentication is enabled for their GitHub account. SignPath MFA and release/workflow protections remain pending confirmation and must be in place before SignPath signing is activated.
 
 ## Artifacts and verification
 

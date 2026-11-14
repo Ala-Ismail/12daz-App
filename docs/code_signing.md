@@ -8,6 +8,8 @@ The release workflow supports Microsoft Azure Artifact Signing (formerly Trusted
 
 The project is also exploring SignPath Foundation's open-source programme. See the public [Code signing policy](code_signing_policy.md) for current status and responsibilities. SignPath is not integrated by the Azure workflow below; leave `SIGNING_ENABLED` unset/false unless intentionally activating Azure signing. SignPath approval and its separate workflow configuration are still required.
 
+The repository owner has confirmed GitHub MFA is enabled. SignPath MFA and release/workflow protections remain pending confirmation; GitHub MFA alone does not activate signing.
+
 1. Use an Azure subscription and create an Artifact Signing account in a supported service region. This is a paid external service: review the current plan and billing before provisioning.
 2. Complete **organization** identity validation for **Lambda Technologies Pty Ltd**, using the legal business details and supporting evidence requested by Azure. Microsoft currently lists Australia as eligible for organization Public Trust validation. Individual validation has different geographic restrictions.
 3. Create a **Public Trust** certificate profile linked to the approved identity. Private Trust and test profiles are not substitutes for publicly trusted application distribution.
