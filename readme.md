@@ -4,6 +4,10 @@ Offline Windows desktop converter from **12daz / 12da to editable 2D DXF 2018**.
 
 Version **0.1.2** is an initial working implementation. Independent CAD comparison and clean-machine release qualification remain pending. Read the conversion report: unsupported geometry, omitted labels/metadata and style substitutions are explicitly reported. DWG remains future work.
 
+![12dAZ Converter dark grey desktop interface](docs/assets/12daz-converter-gui-v0.1.2.png)
+
+*Screenshot uses synthetic demonstration data.*
+
 ## Run the Windows application
 
 The local build is `dist/12dAZ-Converter-0.1.2/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.2-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
