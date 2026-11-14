@@ -1,0 +1,25 @@
+name: Publish release
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-release.yml']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing version tag to build, verify and publish as a pre-release.'
+        required: true
+        default: 'v0.1.2'
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Build and publish requested version
+    uses: ./.github/workflows/test.yml
+    with:
+      release_tag: ${{ inputs.release_tag || 'v0.1.2' }}
+      publish_release: true

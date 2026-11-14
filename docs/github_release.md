@@ -23,6 +23,8 @@ The existing `v0.1.2` tag predates this workflow update. Keep the tag unchanged:
 
 Leaving `release_tag` blank performs a build only. The supplied tag must already exist and must match both the application and `pyproject.toml` versions. For example, tag `v0.1.2` requires version `0.1.2`.
 
+To publish after verification, check **publish_release** when running the workflow. Alternatively, use **Actions > Publish release > Run workflow**, enter the existing tag and run it. That release-specific workflow builds the exact tagged source and publishes the verified ZIP and checksum as a pre-release. Its initial addition to main triggers the requested v0.1.2 publication automatically.
+
 A rerun can refresh attachments on an existing draft. An already published release is preserved; the new package remains available as an Actions artifact. Use a new version/tag for a revised published package.
 
 ## Future versions
@@ -42,6 +44,6 @@ Pushing the tag runs the workflow and prepares the draft automatically. The file
 
 The build job uses read-only repository access. The release job uses GitHub's provided `GITHUB_TOKEN` with `contents: write`; no personal token needs to be added. Repository or organisation policy must allow that workflow permission.
 
-Release preparation runs only after tests, packaging, packaged-app verification and checksum verification succeed. It never publishes a draft automatically, moves a tag or replaces published assets. Build failures appear in Actions, with available packaging diagnostics attached.
+Release preparation runs only after tests, packaging, packaged-app verification and checksum verification succeed. Ordinary tag builds leave drafts; the explicit publish option or release-specific workflow publishes after those checks. Neither workflow moves tags or replaces published assets. Build failures appear in Actions, with available packaging diagnostics attached.
 
 Independent CAD interoperability, clean-machine installation and remaining release gates in [test requirements](test_requirements.md) still need qualification. Passing this workflow does not imply those manual checks have passed.
