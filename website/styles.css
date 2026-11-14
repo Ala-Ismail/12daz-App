@@ -586,8 +586,24 @@ details a {
 }
 .signing-note {
   margin-top: 18px;
-  text-align: center;
-  font-size: 12px;
+  padding: 22px 24px;
+  border: 1px solid #68563b;
+  border-radius: 5px;
+  background: #201f1d;
+  font-size: 13px;
+}
+.signing-note h3 {
+  color: #e9d1a8;
+  font-size: 16px;
+}
+.signing-note p {
+  margin-top: 12px;
+}
+.signing-note blockquote {
+  margin: 16px 0;
+  padding-left: 16px;
+  border-left: 2px solid #bc995e;
+  color: #e9d1a8;
 }
 .signing-note a,
 .policy-page a:not(.button) {

@@ -313,10 +313,31 @@
             </div>
           </div>
         </div>
-        <p class="signing-note">
-          Current v0.1.3 download is unsigned.
-          <a href="code-signing-policy.html">Code signing policy</a>
-        </p>
+        <aside class="signing-note" aria-labelledby="signing-status-title">
+          <h3 id="signing-status-title">Code signing is in progress</h3>
+          <p>
+            We are working toward trusted code signing and exploring the
+            SignPath Foundation open-source programme. Signing is not yet
+            approved or active. The current
+            <strong>v0.1.3 Windows executable is unsigned</strong>, so Windows
+            may show an <strong>Unknown publisher</strong>
+            notice or this Microsoft Defender SmartScreen warning:
+          </p>
+          <blockquote>
+            “Microsoft Defender SmartScreen prevented an unrecognized app from
+            starting. Running this app might put your PC at risk.”
+          </blockquote>
+          <p>
+            Download from our
+            <a href="https://github.com/Ala-Ismail/12daz-App/releases"
+              >official GitHub Releases</a
+            >
+            and verify the ZIP against its published SHA-256 checksum. A
+            checksum verifies download integrity; it does not replace a
+            publisher signature. Read our
+            <a href="code-signing-policy.html">Code signing policy</a>.
+          </p>
+        </aside>
         <div class="coffee-row">
           <p>Finding it useful? Help support development.</p>
           <a class="coffee-link" href="https://paypal.me/12dazapp"

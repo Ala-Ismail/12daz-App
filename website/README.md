@@ -52,4 +52,4 @@ See [website_design.md](website_design.md) for the design brief.
 
 ## Code signing policy
 
-`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. Both state that v0.1.3 is unsigned and SignPath is being explored; do not add an active sponsorship claim before approval and activation. Update both pages and the download notice when a signed release becomes available.
+`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. Both state that v0.1.3 is unsigned and SignPath is being explored; do not add an active sponsorship claim before approval and activation. The download section also displays the signing status, possible Unknown publisher / SmartScreen warning and checksum guidance. Update both pages and the download notice when a signed release becomes available.
