@@ -8,6 +8,12 @@ Version **0.1.3** is an initial working implementation. Independent CAD comparis
 
 *Screenshot uses synthetic demonstration data.*
 
+## Code signing status and Windows warning
+
+We are working toward trusted code signing for 12dAZ Converter and exploring the SignPath Foundation open-source programme. Signing is not yet approved or active, and the current **v0.1.3 Windows executable is unsigned**. In the meantime, Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning such as: **“Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.”**
+
+Download only from the project's [official GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases) and verify the ZIP against its published `SHA256SUMS.txt`. A matching checksum verifies download integrity; it does not replace a publisher signature or establish that a program is safe. See the [Code signing policy](docs/code_signing_policy.md) for current status and release responsibilities.
+
 ## Run the Windows application
 
 The local build is `dist/12dAZ-Converter-0.1.3/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.3-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
