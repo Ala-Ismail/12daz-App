@@ -1,0 +1,68 @@
+﻿# Python caches and environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+.venv*/
+.runtime/
+venv/
+*.egg-info/
+__pypackages__/
+
+# Build and packaging output
+build/
+dist/
+*.exe
+*.msi
+*.msix
+*.whl
+*.egg
+pip-wheel-metadata/
+# Keep 12daz-converter.spec and requirements.lock in version control.
+
+# Local input data and generated conversion output
+sample/
+outputs/
+*.12daz
+*.12da
+*.dxf
+*.dwg
+*.conversion.json
+*.dxf.bak
+*.dwg.bak
+
+# Generated dependency notices are collected from the pinned build environment
+src/az12_converter/resources/dependency_licenses/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.codex/
+.aws/
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+
+# Temporary files and editor recovery files
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~

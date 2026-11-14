@@ -1,0 +1,32 @@
+12dAZ Converter — User Guide
+
+The application uses a dark grey theme with blue primary actions. In smaller windows, scroll the export settings; the Export DXF button remains at the bottom.
+
+1. Open file
+Choose File > Open file, Ctrl+O, or Open file. Select a .12daz ZIP archive containing exactly one .12da payload, or plain .12da text. All processing stays on your computer. Automatic input decoding honours a Unicode BOM and otherwise uses strict UTF-8. For older files, expand Input options in the export panel and choose an encoding before opening the file.
+
+2. Review models
+Models with convertible geometry are selected automatically. Click a model row or press Space to toggle it. Search filters the list without changing hidden selections. Select all selects models containing convertible geometry. Unsupported-only models cannot be selected in this version. View report shows all inspected models, skipped geometry and warnings.
+
+3. Review the plan preview
+Drag to pan. Use the mouse wheel, +/− buttons or Fit to zoom. +Y shows the source coordinate direction. Curves are sampled for display; the DXF keeps exact circular geometry. The 30,000-point preview allowance is shared across the selected models. Changing selection rebuilds the preview in the background after a short pause, giving the selected models the entire allowance. For example, selecting one model gives it all 30,000 points. You can continue toggling models while a preview refresh runs; only the latest selection is displayed. Paths and points are sampled when needed, with a visible simplification label. Changing model selection fits the view to the selected geometry. Export does not use this display limit. Some detail may be absent from the preview. The preview is a guide, not a CAD fidelity reference.
+
+4. Choose units and output
+Select metres, millimetres, feet or inches based on your source data. The converter does not infer units from coordinate magnitudes. This setting declares drawing units; it never rescales coordinates. Choose a .dxf destination. The drawing uses source XY coordinates with Z=0, one layer per model, DXF 2018, and exact circular arcs where supported.
+
+5. Export DXF
+Select Export DXF. Existing DXF/report files require an overwrite confirmation. The worker writes a temporary drawing, reopens and audits it, checks 2D geometry and then publishes it. Cancel requests safe cleanup before publication. If publication already completed, the job reports completion rather than undoing it.
+
+6. Review results
+View report lists source objects, emitted CAD entities, warnings and model/layer mappings. A .dxf.conversion.json report is saved beside the drawing. Completion with warnings means unsupported objects, omitted metadata/labels or style substitutions require review. A report-save failure does not remove an already published DXF. Open output folder locates the result.
+
+Supported initial geometry
+Super strings with data_2d/data_3d and straight/circular radius_data or geometry_data; legacy 2d/3d strings; legacy polyline vertices; XY circles/arcs; basic single-line world-size text; solved horizontal super-alignment geometry containing supported segments. A breakline point string emits individual points. Non-geometry attributes are not written into DXF.
+
+Limitations
+Drainage objects, TINs, meshes, transition curves, symbols, rendered drawables/labels, civil intelligence, paper/screen-size text and text offset/raise placement are not implemented. Objects with unsupported segments are skipped whole rather than replaced by false straight lines. Custom colours/styles/fonts may be substituted and are reported. No coordinate-system transformation, automatic shift, unit scaling, DWG output or CAD editing is provided. Text preview uses a display font; compare final drawings in CAD before use.
+
+Help and ownership
+Help > About shows the installed version/build and copyright notice. Help > License and Third-party Notices opens the bundled licenses offline.
+
+Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160
