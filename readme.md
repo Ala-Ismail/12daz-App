@@ -90,6 +90,7 @@ See [GitHub build and release steps](docs/github_release.md) for details.
 - [Test requirements and cases](docs/test_requirements.md).
 - [Validation status and remaining release checks](docs/validation_status.md).
 - [Code signing policy](docs/code_signing_policy.md): current downloads are unsigned; SignPath is being explored, with no approval or active signing yet.
+- [SignPath signing flow and setup](docs/signpath_setup.md), with an [application preparation packet](docs/signpath_application.md) for maintainer review.
 - [Project agent guidance](.agent).
 
 Private input belongs in ignored `sample/`; generated drawings and local reports belong in ignored `outputs/`. The GUI concept image contains illustrative data and predates the implemented Help menu and Tk controls.

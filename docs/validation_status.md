@@ -75,6 +75,16 @@ The frozen executable returned exit code 0 with `passed: true` for Tk startup, s
 
 This ran on the development machine, which has Python installed. It demonstrates frozen runtime/resource handling, not clean-machine qualification. The earlier unversioned folder was preserved because its executable was running; use the versioned artifact for the updated implementation.
 
+## SignPath preparation checks — 15 November 2026
+
+The application suite was rerun with Python 3.11.5 and the installed pinned build stack: **79 tests passed**, including two Windows VERSIONINFO checks. `scripts/build.py` produced the Windows package with the expected product name, company, original filename and file/product version in the actual executable. Its packaged smoke test passed; local evidence is `outputs/signpath-preparation-smoke.json`.
+
+Both release workflows passed actionlint. The SignPath artifact XML validated against SignPath's published `v1.xsd`. Inline PowerShell and the packaging helper parsed successfully. Local checks exercised 144 provider/result combinations from the actual release expression, plus signing exclusions for PRs, forks, feature branches, untagged requests, cancellation and failed builds. Missing SignPath settings and conflicting providers were rejected. The real unsigned executable, with valid product metadata, was rejected before producing any purported signed distribution.
+
+The packaging helper's downstream success path was also exercised with a test double only at the signature-verification boundary: the real packaged application smoke test, complete bundle ZIP round-trip and regenerated checksum passed. No certificate was created, trusted or used for this check; it is packaging evidence, not a successful signed release.
+
+These checks do not establish SignPath approval, server-side configuration, a valid publisher/timestamp success or live signing. No signing request or new release was submitted. The regenerated local v0.1.3 build is not a replacement for the published v0.1.3 assets; a future signed release requires a new version/tag and the pending manual qualification.
+
 ## Deferred scope and release checks
 
 DWG, TIN/mesh export, drainage plan representations, transition approximation, custom symbols, rendered labels, external style definitions, paper/screen-size text and text offset/raise placement remain unsupported or deferred. Unsupported curves are reported rather than replaced by false straight segments. Drag-and-drop input is not implemented. The GUI excludes unsupported-only models by default; CLI inspection reports all source objects.

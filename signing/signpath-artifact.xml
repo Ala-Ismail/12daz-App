@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Import into SignPath and validate there before enabling production signing.
+     Input is the GitHub upload-artifact ZIP containing only this executable. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="12dAZ-Converter.exe"
+             product-name="12dAZ Converter"
+             product-version="${version}"
+             file-version="${version}"
+             company-name="Lambda Technologies Pty Ltd"
+             original-filename="12dAZ-Converter.exe">
+      <authenticode-sign hash-algorithm="sha256" />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

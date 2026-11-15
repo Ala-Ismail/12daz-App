@@ -43,6 +43,8 @@ jobs:
       version: ${{ steps.package.outputs.version }}
       package_name: ${{ steps.package.outputs.package_name }}
       release_tag: ${{ steps.package.outputs.release_tag }}
+      signpath_artifact_id: ${{ steps.signpath-input.outputs.artifact-id }}
+      source_commit: ${{ steps.package.outputs.source_commit }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,7 +61,16 @@ jobs:
         shell: pwsh
         env:
           RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          SIGNING_ENABLED: ${{ vars.SIGNING_ENABLED }}
+          SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
         run: |
+          foreach ($name in @('SIGNING_ENABLED', 'SIGNPATH_ENABLED')) {
+            $value = [string][Environment]::GetEnvironmentVariable($name)
+            if ($value -cnotin @('', 'false', 'true')) { throw "$name must be unset, false or true" }
+          }
+          if ($env:SIGNING_ENABLED -eq 'true' -and $env:SIGNPATH_ENABLED -eq 'true') {
+            throw 'Select only one signing provider: Azure or SignPath'
+          }
           @'
           import os, re, runpy, tomllib
           from pathlib import Path
@@ -76,6 +87,7 @@ jobs:
               output.write(f'version={version}\npackage_name=12dAZ-Converter-{version}-Windows-x64\nrelease_tag={tag}\n')
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw 'Version validation failed' }
+          "source_commit=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
       - name: Install pinned build dependencies
         run: python -m pip install -r requirements-build.txt
       - name: Run automated tests
@@ -125,11 +137,21 @@ jobs:
             build/12daz-converter/warn-12daz-converter.txt
           if-no-files-found: ignore
 
+      - name: Upload executable for SignPath provenance verification
+        id: signpath-input
+        if: vars.SIGNPATH_ENABLED == 'true' && steps.package.outputs.release_tag != '' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.package_name }}-signpath-input
+          path: dist/12dAZ-Converter-${{ steps.package.outputs.version }}/12dAZ-Converter.exe
+          if-no-files-found: error
+          retention-days: 30
+
   sign:
     name: Sign verified Windows release
     needs: windows
     if: >-
-      vars.SIGNING_ENABLED == 'true' &&
+      vars.SIGNING_ENABLED == 'true' && vars.SIGNPATH_ENABLED != 'true' &&
       needs.windows.outputs.release_tag != '' &&
       github.event_name != 'pull_request' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -243,14 +265,117 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  signpath:
+    name: Request SignPath approval and verify signed release
+    needs: windows
+    if: >-
+      vars.SIGNPATH_ENABLED == 'true' && vars.SIGNING_ENABLED != 'true' &&
+      needs.windows.outputs.release_tag != '' &&
+      github.repository == 'Ala-Ismail/12daz-App' &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: windows-latest
+    timeout-minutes: 90
+    environment: release-signing
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Packaging tools follow the reviewed workflow revision; source was built at the selected tag.
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Validate SignPath settings
+        shell: pwsh
+        env:
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_PUBLISHER: ${{ vars.SIGNPATH_PUBLISHER }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ARTIFACT_ID: ${{ needs.windows.outputs.signpath_artifact_id }}
+        run: |
+          $required = @('SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT_SLUG', 'SIGNPATH_SIGNING_POLICY_SLUG', 'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG', 'SIGNPATH_PUBLISHER', 'SIGNPATH_API_TOKEN', 'SIGNPATH_ARTIFACT_ID')
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing SignPath setting: $name. See docs/signpath_setup.md."
+            }
+          }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.package_name }}
+          path: package
+      - name: Verify original package checksum
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
+        run: |
+          $archive = Join-Path $PWD "package/$env:PACKAGE_NAME.zip"
+          $expected = ((Get-Content -LiteralPath 'package/SHA256SUMS.txt' -Raw).Trim() -split '\s+')[0]
+          if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw 'Original package checksum verification failed'
+          }
+      - name: Submit request and wait for manual SignPath approval
+        id: signpath-request
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ needs.windows.outputs.signpath_artifact_id }}
+          github-token: ${{ github.token }}
+          parameters: |
+            version: ${{ toJSON(needs.windows.outputs.version) }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed-executable
+      - name: Record signing request for the release reviewer
+        if: always() && steps.signpath-request.outputs.signing-request-id != ''
+        shell: pwsh
+        env:
+          REQUEST_ID: ${{ steps.signpath-request.outputs.signing-request-id }}
+          REQUEST_URL: ${{ steps.signpath-request.outputs.signing-request-web-url }}
+          SOURCE_COMMIT: ${{ needs.windows.outputs.source_commit }}
+          RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+        run: |
+          "SignPath request: $env:REQUEST_ID ($env:REQUEST_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "Source: $env:RELEASE_TAG at $env:SOURCE_COMMIT" >> $env:GITHUB_STEP_SUMMARY
+      - name: Verify signature, smoke test and package approved executable
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ needs.windows.outputs.version }}
+          PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
+          SIGNPATH_PUBLISHER: ${{ vars.SIGNPATH_PUBLISHER }}
+        run: |
+          ./scripts/package_signpath_release.ps1 `
+            -OriginalArchive "package/$env:PACKAGE_NAME.zip" `
+            -SignedExecutable 'signed-executable/12dAZ-Converter.exe' `
+            -Version $env:PACKAGE_VERSION `
+            -ExpectedPublisher $env:SIGNPATH_PUBLISHER `
+            -OutputDirectory 'signed-package'
+      - name: Upload approved signed release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.windows.outputs.package_name }}-signed
+          path: |
+            signed-package/${{ needs.windows.outputs.package_name }}.zip
+            signed-package/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
   release:
     name: Prepare draft pre-release
-    needs: [windows, sign]
+    needs: [windows, sign, signpath]
     if: >-
       always() && !cancelled() && needs.windows.result == 'success' &&
       needs.windows.outputs.release_tag != '' && github.event_name != 'pull_request' &&
-      ((vars.SIGNING_ENABLED == 'true' && needs.sign.result == 'success') ||
-       (vars.SIGNING_ENABLED != 'true' && needs.sign.result == 'skipped'))
+      ((vars.SIGNING_ENABLED == 'true' && vars.SIGNPATH_ENABLED != 'true' && needs.sign.result == 'success' && needs.signpath.result == 'skipped') ||
+       (vars.SIGNPATH_ENABLED == 'true' && vars.SIGNING_ENABLED != 'true' && needs.signpath.result == 'success' && needs.sign.result == 'skipped') ||
+       (vars.SIGNING_ENABLED != 'true' && vars.SIGNPATH_ENABLED != 'true' && needs.sign.result == 'skipped' && needs.signpath.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -259,7 +384,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ format('{0}{1}', needs.windows.outputs.package_name, needs.sign.result == 'success' && '-signed' || '') }}
+          name: ${{ format('{0}{1}', needs.windows.outputs.package_name, (needs.sign.result == 'success' || needs.signpath.result == 'success') && '-signed' || '') }}
           path: package
       - name: Verify download checksum
         working-directory: package
@@ -272,7 +397,8 @@ jobs:
           RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
           PACKAGE_NAME: ${{ needs.windows.outputs.package_name }}
           PUBLISH_RELEASE: ${{ inputs.publish_release && 'true' || 'false' }}
-          SIGNED_PACKAGE: ${{ needs.sign.result == 'success' && 'true' || 'false' }}
+          SIGNED_PACKAGE: ${{ (needs.sign.result == 'success' || needs.signpath.result == 'success') && 'true' || 'false' }}
+          SIGNPATH_PACKAGE: ${{ needs.signpath.result == 'success' && 'true' || 'false' }}
         run: |
           set -euo pipefail
           asset="package/$PACKAGE_NAME.zip"
@@ -293,6 +419,9 @@ jobs:
           if [[ "$SIGNED_PACKAGE" == "true" ]]; then
             echo '' >> release-notes.md
             echo 'The application executable has a verified, timestamped publisher signature. New releases can still receive Microsoft Defender SmartScreen reputation warnings.' >> release-notes.md
+            if [[ "$SIGNPATH_PACKAGE" == "true" ]]; then
+              echo 'Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).' >> release-notes.md
+            fi
           else
             echo '' >> release-notes.md
             echo 'This build is unsigned. Windows may show an unknown-publisher or Microsoft Defender SmartScreen warning.' >> release-notes.md

@@ -1,14 +1,18 @@
 # Windows publisher signing
 
-The release workflow supports Microsoft Azure Artifact Signing (formerly Trusted Signing), using a **Public Trust** certificate profile and GitHub OpenID Connect (OIDC). No private key, PFX file or client secret is stored in the repository.
+The release workflow has optional **SignPath** and **Azure Artifact Signing** paths. SignPath uses a submission-only API token stored in a protected GitHub environment and manual approval in SignPath. Azure uses a Public Trust profile and GitHub OpenID Connect (OIDC). No private signing key or PFX is stored in the repository.
 
-**Status:** integration is prepared, but signing is not active until the owner completes Azure identity verification and configures GitHub. Existing published v0.1.3 downloads remain unsigned. No signed release has been produced or verified against Azure by this change.
+**Status:** integrations are prepared but inactive. Existing published v0.1.3 downloads remain unsigned. No application or signing request has been submitted, and no signed release has been produced or verified against either provider by this work.
 
-## One-time owner setup
+## SignPath setup and approval
 
-The project is also exploring SignPath Foundation's open-source programme. See the public [Code signing policy](code_signing_policy.md) for current status and responsibilities. SignPath is not integrated by the Azure workflow below; leave `SIGNING_ENABLED` unset/false unless intentionally activating Azure signing. SignPath approval and its separate workflow configuration are still required.
+Use [SignPath setup](signpath_setup.md) for the prepared flow and environment settings, and the [application preparation packet](signpath_application.md) for owner review. See the public [Code signing policy](code_signing_policy.md) for responsibilities and privacy.
+
+`SIGNPATH_ENABLED=true` selects SignPath; `SIGNING_ENABLED=true` selects Azure. These are repository-level variables. Both providers disabled/unset keeps unsigned builds available. Enabling both, or using an invalid switch value, fails the build. The selected provider must succeed before publication; there is no automatic unsigned fallback. Provider account acceptance and protected environment settings must be completed before enabling either switch.
 
 The repository owner has confirmed GitHub MFA is enabled. SignPath MFA and release/workflow protections remain pending confirmation; GitHub MFA alone does not activate signing.
+
+## Azure one-time owner setup
 
 1. Use an Azure subscription and create an Artifact Signing account in a supported service region. This is a paid external service: review the current plan and billing before provisioning.
 2. Complete **organization** identity validation for **Lambda Technologies Pty Ltd**, using the legal business details and supporting evidence requested by Azure. Microsoft currently lists Australia as eligible for organization Public Trust validation. Individual validation has different geographic restrictions.
@@ -35,7 +39,7 @@ The repository owner has confirmed GitHub MFA is enabled. SignPath MFA and relea
 
 See Microsoft's [setup and current eligibility](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart), [role assignments](https://learn.microsoft.com/en-us/azure/artifact-signing/tutorial-assign-roles) and the official [signing action](https://github.com/Azure/artifact-signing-action).
 
-## Release behaviour
+## Azure release behaviour
 
 - Branch and pull-request builds remain unsigned development artifacts and have no signing-job OIDC permissions. Release signing runs only for version-tag builds, or a requested release tag from a workflow running on `main`/a version tag, with `SIGNING_ENABLED=true`.
 - The build job tests and packages the exact selected source and smoke-tests it. The separate signing job checks the artifact's ZIP checksum and extracts it, authenticates through short-lived OIDC, and signs **only `12dAZ-Converter.exe`**. Third-party Python/runtime DLLs are not re-signed as this publisher.
@@ -61,3 +65,5 @@ Public signing establishes a verifiable publisher. It does not guarantee an imme
 ## Local verification of this integration
 
 Both workflows passed actionlint validation. Their inline PowerShell blocks parsed successfully. The actual configuration block rejected missing settings, and the actual signed-package verification block rejected the existing unsigned v0.1.3 executable before smoke testing, re-packaging or publication. Azure authentication, signing, publisher/timestamp acceptance and the signed-package success path remain untested until account setup is complete.
+
+SignPath-specific checks and remaining live approval checks are recorded in [signpath_setup.md](signpath_setup.md). Executable metadata generation is covered by `tests/test_windows_version.py`; the application must be rebuilt from source containing that metadata before it is eligible for the prepared SignPath configuration.
