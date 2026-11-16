@@ -56,6 +56,6 @@ See [website_design.md](website_design.md) for the design brief.
 
 ## Hero image
 
-The homepage hero uses `assets/surveyor-hero.webp` with a smaller 960px variant. It is an AI-generated field scene with a synthetic survey and an illustrative interface, labelled in the visible caption. It is not an application screenshot or evidence of survey fidelity. The actual application screenshot remains directly below the hero. On smaller screens the photo follows the headline and download controls so both remain readable.
+The homepage hero uses `assets/surveyor-hero.webp` with a smaller 960px variant. It is an AI-generated field scene with a synthetic survey and an illustrative interface, labelled in the visible caption. It is not an application screenshot or evidence of survey fidelity. The actual application screenshot remains directly below the hero. The slideshow forms a shared background behind the top navigation and hero title, with dark overlays for readable text on desktop and mobile.
 
 The hero cycles through road, port and open-pit mining survey scenes every five seconds with a short crossfade. Its pause/resume button supports keyboard use. Automatic cycling stops when the tab is hidden and defaults to paused when reduced motion is requested. Without JavaScript the first scene remains visible. Images share a fixed layout so changing slides does not move the content.

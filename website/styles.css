@@ -920,22 +920,28 @@ details a {
   }
 }
 
-/* Field context in the hero; the real application screenshot follows below. */
-.hero-scene {
+/* A shared full-width backdrop for the navigation and opening title. */
+.hero-masthead {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  text-align: left;
+  background: var(--bg);
 }
-.hero-copy {
-  position: relative;
-  z-index: 1;
-  width: 51%;
-  padding: 54px 0 64px 36px;
-  background: linear-gradient(90deg, #14171cf5, #14171cba 75%, transparent);
+.hero-masthead::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #14171cf2 0%, #14171cd9 28%, #14171c30 66%),
+    linear-gradient(180deg, #14171c99 0%, transparent 30%, #14171c44 85%, var(--bg) 100%);
+  pointer-events: none;
 }
+.hero-masthead .site-header {
+  background: #14171c40;
+  border-color: #ffffff26;
+}
+.hero-title { padding: 72px 0 100px; }
+.hero-copy { text-align: left; }
 .hero-copy h1 {
   font-size: clamp(42px, 4.6vw, 62px);
   letter-spacing: -2.5px;
@@ -943,20 +949,18 @@ details a {
 .hero-copy .hero-description {
   max-width: 430px;
   margin: 0;
-  padding-right: 25px;
   font-size: 16px;
 }
 .hero-copy .hero-actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+  max-width: 520px;
 }
-.hero-copy .release-meta {
-  max-width: 400px;
-}
+.hero-copy .release-meta { max-width: 430px; }
 .hero-photo {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   margin: 0;
 }
 .hero-photo img {
@@ -966,41 +970,18 @@ details a {
   object-fit: cover;
   object-position: 62% top;
 }
-.hero-photo figcaption {
+.hero-credit {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: 14px;
+  right: max(20px, calc((100% - 1160px) / 2));
+  z-index: 1;
+  margin: 0;
   padding: 7px 12px;
   background: #14171ce8;
   color: #c5cbd4;
   font: 9px/1.6 var(--mono);
 }
-@media (max-width: 1000px) {
-  .hero-scene { text-align: center; }
-  .hero-copy {
-    width: 100%;
-    padding: 30px 22px 18px;
-    background: var(--bg);
-  }
-  .hero-copy .hero-description {
-    margin-inline: auto;
-    padding-right: 0;
-  }
-  .hero-copy .hero-actions { justify-content: center; }
-  .hero-copy .release-meta { margin-inline: auto; }
-  .hero-photo { position: relative; z-index: auto; }
-  .hero-photo img { height: auto; object-fit: contain; }
-  .hero-photo figcaption {
-    position: static;
-    font-size: 9px;
-    text-align: center;
-  }
-}
-
-.hero-slides {
-  display: grid;
-  height: 100%;
-}
+.hero-slides { display: grid; height: 100%; }
 .hero-slides .hero-slide {
   grid-area: 1 / 1;
   min-width: 0;
@@ -1011,8 +992,8 @@ details a {
 .hero-pause {
   position: absolute;
   z-index: 2;
-  bottom: 42px;
-  right: 12px;
+  bottom: 58px;
+  right: max(20px, calc((100% - 1160px) / 2));
   border: 1px solid #88919f;
   border-radius: 4px;
   padding: 7px 10px;
@@ -1028,6 +1009,19 @@ details a {
   outline-offset: 3px;
 }
 @media (max-width: 1000px) {
-  .hero-slides { height: auto; }
-  .hero-pause { bottom: 55px; }
+  .hero-masthead::after {
+    background: linear-gradient(90deg, #14171cf2, #14171ca8 65%, #14171c66),
+      linear-gradient(0deg, var(--bg), transparent 45%);
+  }
+  .hero-photo img { object-position: 65% top; }
+  .hero-title { padding: 48px 0 112px; }
+}
+@media (max-width: 680px) {
+  .hero-title { padding-top: 42px; }
+  .hero-copy { text-align: center; }
+  .hero-copy .hero-description,
+  .hero-copy .release-meta { margin-inline: auto; }
+  .hero-copy .hero-actions { justify-content: center; }
+  .hero-credit { left: 18px; right: 18px; text-align: center; }
+  .hero-pause { right: 18px; bottom: 72px; }
 }
