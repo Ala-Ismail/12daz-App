@@ -53,3 +53,7 @@ See [website_design.md](website_design.md) for the design brief.
 ## Code signing policy
 
 `code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The website states that v0.1.3 is unsigned and multiple signing options are being explored; keep the wording provider-neutral until a provider is selected and signing is activated. The download section also displays the signing status, possible Unknown publisher / SmartScreen warning and checksum guidance. Update both pages and the download notice when a signed release becomes available.
+
+## Hero image
+
+The homepage hero uses `assets/surveyor-hero.webp` with a smaller 960px variant. It is an AI-generated field scene with a synthetic survey and an illustrative interface, labelled in the visible caption. It is not an application screenshot or evidence of survey fidelity. The actual application screenshot remains directly below the hero. On smaller screens the photo follows the headline and download controls so both remain readable.
