@@ -30,13 +30,13 @@ The ezdxf documentation explicitly supports creating DXF documents and explicitl
 
 ## Available sample and format evidence
 
-The local sample is `sample/1.7 SHRP-SMEC-WGI-RBT-M3D-COMBINED.12daz`.
+The private local sample is stored in the ignored `sample/` directory; its filename is omitted.
 
 Initial inspection only, without a geometry parse:
 
 - Compressed file size: 3,915,027 bytes.
 - ZIP signature: `50 4B 03 04`.
-- Contains one entry: `SHRP-SMEC-WGI-RBT-M3D-COMBINED.12da`.
+- Contains one `.12da` entry; its filename is omitted.
 - Declared uncompressed size: 88,923,538 bytes.
 - Payload starts with a UTF-16 little-endian BOM and `null null`, followed by archive comments.
 
