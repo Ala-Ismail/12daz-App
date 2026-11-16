@@ -1,6 +1,6 @@
 # 12dAZ Converter website
 
-Static product and download page. No dependencies, JavaScript or build step.
+Static product and download page. No dependencies or build step. A small local JavaScript file controls the hero slideshow.
 
 ## Preview locally
 
@@ -57,3 +57,5 @@ See [website_design.md](website_design.md) for the design brief.
 ## Hero image
 
 The homepage hero uses `assets/surveyor-hero.webp` with a smaller 960px variant. It is an AI-generated field scene with a synthetic survey and an illustrative interface, labelled in the visible caption. It is not an application screenshot or evidence of survey fidelity. The actual application screenshot remains directly below the hero. On smaller screens the photo follows the headline and download controls so both remain readable.
+
+The hero cycles through road, port and open-pit mining survey scenes every five seconds with a short crossfade. Its pause/resume button supports keyboard use. Automatic cycling stops when the tab is hidden and defaults to paused when reduced motion is requested. Without JavaScript the first scene remains visible. Images share a fixed layout so changing slides does not move the content.

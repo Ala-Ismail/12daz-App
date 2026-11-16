@@ -78,8 +78,10 @@
           <span aria-hidden="true">/</span> Free &amp; open source
         </p>
           </div>
-          <figure class="hero-photo">
+          <figure class="hero-photo" aria-label="Illustrative survey scenes">
+            <div class="hero-slides">
             <img
+              class="hero-slide is-active"
               src="assets/surveyor-hero.webp"
               srcset="assets/surveyor-hero-960.webp 960w, assets/surveyor-hero.webp 1672w"
               sizes="(max-width: 1000px) calc(100vw - 48px), 1160px"
@@ -88,8 +90,18 @@
               alt="Illustrative scene of two surveyors, an Asian woman and an older man wearing glasses, working with a total station beside a laptop displaying a synthetic road survey plan"
               fetchpriority="high"
             />
+            <img class="hero-slide" src="assets/surveyor-port.webp"
+              srcset="assets/surveyor-port-960.webp 960w, assets/surveyor-port.webp 1672w"
+              sizes="(max-width: 1000px) calc(100vw - 48px), 1160px"
+              width="1672" height="941" alt="Illustrative port survey with two surveyors, cargo cranes and a laptop showing a synthetic quay plan" aria-hidden="true" />
+            <img class="hero-slide" src="assets/surveyor-mine.webp"
+              srcset="assets/surveyor-mine-960.webp 960w, assets/surveyor-mine.webp 1672w"
+              sizes="(max-width: 1000px) calc(100vw - 48px), 1160px"
+              width="1672" height="941" alt="Illustrative mining survey with two surveyors overlooking an open-pit mine and a laptop showing a synthetic mine plan" aria-hidden="true" />
+            </div>
             <figcaption>AI-generated scene · synthetic survey · illustrative interface</figcaption>
           </figure>
+          <button class="hero-pause" type="button" hidden>Pause slideshow</button>
         </div>
 
         <figure class="app-preview">
@@ -482,5 +494,6 @@
         </div>
       </div>
     </footer>
+    <script src="hero-slideshow.js" defer></script>
   </body>
 </html>

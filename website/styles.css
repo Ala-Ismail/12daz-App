@@ -996,3 +996,38 @@ details a {
     text-align: center;
   }
 }
+
+.hero-slides {
+  display: grid;
+  height: 100%;
+}
+.hero-slides .hero-slide {
+  grid-area: 1 / 1;
+  min-width: 0;
+  opacity: 0;
+  transition: opacity 800ms ease;
+}
+.hero-slides .hero-slide.is-active { opacity: 1; }
+.hero-pause {
+  position: absolute;
+  z-index: 2;
+  bottom: 42px;
+  right: 12px;
+  border: 1px solid #88919f;
+  border-radius: 4px;
+  padding: 7px 10px;
+  background: #14171ce8;
+  color: var(--text);
+  font: 11px/1.4 var(--mono);
+  cursor: pointer;
+}
+.hero-pause[hidden] { display: none; }
+.hero-pause:hover { background: #303741; }
+.hero-pause:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+@media (max-width: 1000px) {
+  .hero-slides { height: auto; }
+  .hero-pause { bottom: 55px; }
+}
