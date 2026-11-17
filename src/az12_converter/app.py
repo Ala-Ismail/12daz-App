@@ -51,17 +51,22 @@ class ConverterApp:
         self.filename = tk.StringVar(value="Open a local .12daz or .12da file to begin")
         self.search = tk.StringVar()
         self.output = tk.StringVar()
+        self.geometry_mode = tk.StringVar(value="Flatten 2D")
+        self.plan_tolerance = tk.StringVar(value="0.01")
+        self.elevation_tolerance = tk.StringVar(value="0.01")
         self.units = tk.StringVar(value="Choose units…")
         self.encoding = tk.StringVar(value="Automatic (BOM / UTF-8)")
         self.status = tk.StringVar(value="Ready · all processing stays on this computer")
         self.summary = tk.StringVar(value="No file loaded")
-        self.cursor = tk.StringVar(value="Plan view · Z = 0")
+        self.cursor = tk.StringVar(value="Plan preview")
         self._styles()
         root.iconphoto(True, self.icons['logo'])
         self._menu()
         self._layout()
         self.search.trace_add("write", lambda *_: self.populate_models())
         self.units.trace_add("write", lambda *_: self.settings_changed())
+        self.plan_tolerance.trace_add("write", lambda *_: self.settings_changed())
+        self.elevation_tolerance.trace_add("write", lambda *_: self.settings_changed())
         self.output.trace_add("write", lambda *_: self.settings_changed())
         self.status.trace_add("write", lambda *_: self.update_status_display())
         self.update_controls()
@@ -174,8 +179,10 @@ class ConverterApp:
             widget.configure(state='disabled' if self.busy else 'normal')
         for widget in (self.all_button, self.none_button):
             widget.configure(state='normal' if not self.busy or preview_running else 'disabled')
-        for widget in (self.unit_combo, self.encoding_combo, self.format_combo, self.layer_combo):
+        for widget in (self.unit_combo, self.encoding_combo, self.format_combo, self.layer_combo, self.geometry_combo):
             widget.configure(state='disabled' if self.busy else 'readonly')
+        for widget in self.tolerance_entries:
+            widget.configure(state='normal' if not self.busy and self.geometry_mode.get() == 'Keep Z' else 'disabled')
         self.file_menu.entryconfigure(0, state='disabled' if self.busy else 'normal')
         self.report_button.configure(state='normal' if self.result or self.scan else 'disabled')
         self.update_status_display()
@@ -199,7 +206,7 @@ class ConverterApp:
         self.scan = self.result = None
         self.selected.clear()
         self.units.set("Choose units…")
-        self.output.set(str(Path(path).with_name(Path(path).stem + "_2D.dxf")))
+        self.output.set(str(self.default_output()))
         self.filename.set(Path(path).name)
         self.summary.set("Reading models…")
         self.populate_models()
@@ -208,6 +215,20 @@ class ConverterApp:
 
     def chosen_encoding(self):
         return None if self.encoding.get().startswith("Automatic") else self.encoding.get()
+
+    def default_output(self):
+        source = Path(self.path)
+        suffix = "_3D.dxf" if self.geometry_mode.get() == "Keep Z" else "_2D.dxf"
+        return source.with_name(source.stem + suffix)
+
+    def geometry_changed(self, _event):
+        if self.path:
+            source = Path(self.path)
+            defaults = {source.with_name(source.stem + suffix) for suffix in ("_2D.dxf", "_3D.dxf")}
+            if Path(self.output.get()) in defaults:
+                self.output.set(str(self.default_output()))
+                return
+        self.settings_changed()
 
     def populate_models(self):
         self.refresh_search_hint()
@@ -321,13 +342,27 @@ class ConverterApp:
     def export(self):
         if self.busy or self.preview_pending or not self.scan:
             return
+        mode = "keep-z" if self.geometry_mode.get() == "Keep Z" else "flatten-2d"
+        tolerances = {}
+        if mode == "keep-z":
+            try:
+                tolerances = {"plan_tolerance": float(self.plan_tolerance.get()),
+                              "elevation_tolerance": float(self.elevation_tolerance.get())}
+                if not all(math.isfinite(value) and value > 0 for value in tolerances.values()):
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Invalid alignment tolerance",
+                                     "Enter positive finite plan and elevation tolerances in drawing units.",
+                                     parent=self.root)
+                return
         output = Path(self.output.get())
         overwrite = False
         if output.exists() or Path(str(output) + ".conversion.json").exists():
             overwrite = messagebox.askyesno("Replace existing output?", "Replace the existing DXF and its conversion report?", parent=self.root)
             if not overwrite:
                 return
-        options = Options(units=self.units.get(), models=sorted(self.selected), overwrite=overwrite, encoding=self.chosen_encoding())
+        options = Options(units=self.units.get(), models=sorted(self.selected), overwrite=overwrite,
+                          encoding=self.chosen_encoding(), geometry_mode=mode, **tolerances)
         self.start_job("convert", options)
 
     def start_job(self, action, options):
@@ -442,7 +477,7 @@ class ConverterApp:
         if self.scan:
             x = self.origin[0] + (event.x - self.offset[0]) / self.scale
             y = self.origin[1] - (event.y - self.offset[1]) / self.scale
-            self.cursor.set(f"X {x:,.3f}    Y {y:,.3f}    Plan view · Z = 0")
+            self.cursor.set(f"X {x:,.3f}    Y {y:,.3f}    Plan preview")
 
     def schedule_draw(self, event=None):
         if self._redraw_job:

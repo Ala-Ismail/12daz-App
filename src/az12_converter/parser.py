@@ -84,7 +84,7 @@ class TokenStream:
 
 
 # These contain source metadata or independently rendered labels, not base plan geometry.
-DISCARD_BLOCKS = {"attributes", "drawables", "horizontal_parts", "vertical_parts", "vertical_data", "computator", "geometry_modifiers"}
+DISCARD_BLOCKS = {"attributes", "drawables", "computator"}
 
 
 def read_block(stream, limits, depth=1, discard=False, budget=None):

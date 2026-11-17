@@ -49,18 +49,25 @@ class DxfWriter:
             warn("COLOUR_SUBSTITUTION", f"Unresolved colour {primitive.colour!r}; using white/black CAD index 7.")
         if primitive.style.lower() not in {"1", "continuous"}:
             warn("LINESTYLE_SUBSTITUTION", f"Unresolved style {primitive.style!r}; using CONTINUOUS.")
+        levels = primitive.elevations
+        z = levels[0] if levels else 0
         if primitive.kind == "point":
-            self.space.add_point((*primitive.points[0], 0), dxfattribs=attrs)
+            self.space.add_point((*primitive.points[0], z), dxfattribs=attrs)
         elif primitive.kind == "circle":
-            self.space.add_circle((*primitive.points[0], 0), primitive.radius, dxfattribs=attrs)
+            self.space.add_circle((*primitive.points[0], z), primitive.radius, dxfattribs=attrs)
         elif primitive.kind == "polyline":
             points = [(x, y, primitive.bulges[i] if i < len(primitive.bulges) else 0) for i, (x, y) in enumerate(primitive.points)]
-            self.space.add_lwpolyline(points, format="xyb", close=primitive.closed, dxfattribs=attrs)
+            if any(level != z for level in levels):
+                self.space.add_polyline3d([(*xy, level) for xy, level in zip(primitive.points, levels)],
+                                          close=primitive.closed, dxfattribs=attrs)
+            else:
+                self.space.add_lwpolyline(points, format="xyb", close=primitive.closed,
+                                          dxfattribs={**attrs, "elevation": z})
         elif primitive.kind == "text":
             alignment = primitive.justify.upper().replace("CENTRE", "CENTER").replace("-", "_")
             text = self.space.add_text(primitive.text, dxfattribs={**attrs, "height": primitive.height,
                        "width": primitive.width, "oblique": primitive.slant, "rotation": primitive.rotation})
-            text.set_placement((*primitive.points[0], 0), align=getattr(enums.TextEntityAlignment, alignment))
+            text.set_placement((*primitive.points[0], z), align=getattr(enums.TextEntityAlignment, alignment))
         else:
             raise ConversionError(f"Unexpected output primitive {primitive.kind}.")
         self.count += 1
@@ -70,7 +77,7 @@ class DxfWriter:
         self.doc.saveas(path)
 
 
-def validate_dxf(path, expected_count, cancel=None):
+def validate_dxf(path, expected_count, cancel=None, *, keep_z=False):
     checkpoint(cancel)
     doc = ezdxf.readfile(path)
     audit = doc.audit()
@@ -84,16 +91,25 @@ def validate_dxf(path, expected_count, cancel=None):
     for entity in space:
         checkpoint(cancel)
         for name in ("elevation", "thickness"):
-            if entity.dxf.hasattr(name) and entity.dxf.get(name) != 0:
-                raise ConversionError(f"Nonzero output {name}.")
+            if entity.dxf.hasattr(name):
+                value = entity.dxf.get(name)
+                coordinates = (value,) if isinstance(value, (int, float)) else tuple(value)
+                if not all(math.isfinite(v) for v in coordinates) or (name == "thickness" or not keep_z) and any(coordinates):
+                    raise ConversionError(f"Invalid output {name}.")
         for name in ("location", "center", "insert", "align_point"):
             if entity.dxf.hasattr(name):
                 point = entity.dxf.get(name)
-                if point.z != 0 or not all(math.isfinite(v) for v in point):
+                if (not keep_z and point.z != 0) or not all(math.isfinite(v) for v in point):
                     raise ConversionError("Output geometry has invalid coordinates or nonzero Z.")
         if tuple(entity.dxf.get("extrusion", (0, 0, 1))) != (0, 0, 1):
             raise ConversionError("Nonstandard output extrusion.")
         if entity.dxftype() == "LWPOLYLINE":
             if any(not math.isfinite(v) for point in entity.get_points("xyb") for v in point):
                 raise ConversionError("Invalid polyline coordinates.")
+        if entity.dxftype() == "POLYLINE":
+            if not keep_z or not entity.is_3d_polyline:
+                raise ConversionError("Unexpected 3D polyline.")
+            for vertex in entity.vertices:
+                if not all(math.isfinite(v) for v in vertex.dxf.location):
+                    raise ConversionError("Invalid 3D polyline coordinates.")
     return doc

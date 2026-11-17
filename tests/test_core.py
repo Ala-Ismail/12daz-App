@@ -181,6 +181,110 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(list(polyline.get_points("xy")), [(500000., 6200000.), (500001.25, 6200002.5)])
         self.assertEqual(polyline.dxf.elevation, 0)
 
+    def test_EG01_keep_z_preserves_stacked_vertices_and_elevated_circle(self):
+        self.convert(
+            'string 3d { breakline line data_3d { 0 10 -2 0 10 3 10 10 5 } } '
+            'string circle { xcentre 2 ycentre 4 zcentre 12 radius 3 }',
+            geometry_mode="keep-z",
+        )
+        polyline, circle = self.entities()
+        self.assertTrue(polyline.is_3d_polyline)
+        self.assertEqual([tuple(v.dxf.location) for v in polyline.vertices],
+                         [(0, 10, -2), (0, 10, 3), (10, 10, 5)])
+        self.assertEqual(tuple(circle.dxf.center), (2, 4, 12))
+
+    def test_EG05_ip_only_alignment_reconstructs_closed_plan(self):
+        self.convert(
+            'string super_alignment { horizontal_ips_only true valid_horizontal true closed 1 '
+            'horizontal_parts { ip { x 0 y 0 } ip { x 10 y 0 } ip { x 10 y 5 } } }'
+        )
+        polyline, = self.entities()
+        self.assertTrue(polyline.closed)
+        self.assertEqual(list(polyline.get_points("xy")), [(0, 0), (10, 0), (10, 5)])
+
+    def test_EG05_ip_only_alignment_rejects_conflicting_solved_plan(self):
+        self.fixture(
+            LINE + ' string super_alignment { horizontal_ips_only true valid_horizontal true '
+            'horizontal_parts { ip { x 0 y 0 } ip { x 10 y 0 } } '
+            'horizontal_data { breakline line data_2d { 0 0 10 1 } } }'
+        )
+        report = inspect_file(self.source)
+        self.assertTrue(any("disagree with solved alignment" in d["message"]
+                            for d in report["diagnostics"]["details"]))
+
+    def test_EG05_ip_flag_preserves_solved_arc_for_arc_parts(self):
+        self.convert(
+            'string super_alignment { horizontal_ips_only true valid_horizontal true '
+            'horizontal_parts { arc {} arc {} } '
+            'horizontal_data { breakline line data_2d {0 0 10 0} radius_data {10} } }'
+        )
+        polyline, = self.entities()
+        self.assertNotEqual(list(polyline.get_points("b"))[0][0], 0)
+
+    def test_EG05_reconstructs_fixed_line_tangent_arc(self):
+        self.convert(
+            'string super_alignment { valid_horizontal true '
+            'horizontal_parts { fixed_line { x1 0 y1 0 x2 20 y2 0 } '
+            'free_arc_radius { r -5 } fixed_line { x1 20 y1 0 x2 20 y2 20 } } }'
+        )
+        polyline, = self.entities()
+        points = list(polyline.get_points("xyb"))
+        self.assertEqual(len(points), 4)
+        for actual, expected in zip(points, [(0, 0, 0), (15, 0, math.sqrt(2) - 1),
+                                             (20, 5, 0), (20, 20, 0)]):
+            for value, target in zip(actual, expected):
+                self.assertAlmostEqual(value, target)
+
+    def test_EG07_solved_alignment_samples_parabolic_profile(self):
+        report = self.convert(
+            'string super_alignment { horizontal_data { breakline line data_2d {0 0 40 0} } '
+            'vertical_data { data_2d {0 10 40 10} '
+            'geometry_data { parabola { chainage 20 height 9.5 } } } }',
+            geometry_mode="keep-z", elevation_tolerance=0.001,
+        )
+        polyline, = self.entities()
+        points = [tuple(v.dxf.location) for v in polyline.vertices]
+        self.assertEqual(points[0], (0, 0, 10))
+        self.assertEqual(points[-1], (40, 0, 10))
+        self.assertIn((20, 0, 9.75), points)
+        for x, y, z in points:
+            self.assertEqual(y, 0)
+            self.assertAlmostEqual(z, 10 - x / 40 + x * x / 1600)
+        for (a, _, za), (b, _, zb) in zip(points, points[1:]):
+            midpoint = (a + b) / 2
+            expected = 10 - midpoint / 40 + midpoint * midpoint / 1600
+            self.assertLessEqual(abs((za + zb) / 2 - expected), 0.001)
+        self.assertEqual(report["options"]["elevation_tolerance"], 0.001)
+
+    def test_EG04_drainage_exports_pipe_spans_at_pit_indices(self):
+        text = (
+            'string drainage { data { 0 0 9 0 0  1 0 8 0 1  2 1 7 0 0  3 1 6 0 0 } '
+            'pit { ip 0 x 0 y 0 } pit_v2 { ip 2 x 2 y 1 } pit { ip 3 x 3 y 1 } '
+            'pipe { us_level 2 ds_level 1 } pipe { us_level 1 ds_level 0 } }'
+        )
+        report = self.convert(text)
+        first, second = self.entities()
+        self.assertEqual(list(first.get_points("xy")), [(0, 0), (1, 0), (2, 1)])
+        self.assertEqual(list(second.get_points("xy")), [(2, 1), (3, 1)])
+        self.assertEqual(first.dxf.elevation, 0)
+        self.assertEqual(report["diagnostics"]["counts"]["DRAINAGE_PLAN_ONLY"], 1)
+        keep_z = inspect_file(self.source, Options(geometry_mode="keep-z"))
+        self.assertTrue(any("centreline elevations" in d["message"] for d in keep_z["diagnostics"]["details"]))
+        self.fixture(text.replace("ip 2 x 2", "ip 2 x 5"))
+        invalid = inspect_file(self.source)
+        self.assertTrue(any("disagree with the solved vertices" in d["message"]
+                            for d in invalid["diagnostics"]["details"]))
+
+    def test_EG06_reports_active_transition_uses_solved_plan(self):
+        report = self.convert(
+            'string super_alignment { horizontal_parts { '
+            'transition_compound_curve { r1 10 r2 -10 } } '
+            'horizontal_data { breakline line data_2d { 0 0 10 0 } } }'
+        )
+        self.assertIn("ALIGNMENT_TRANSITION_SOLVED_ONLY", report["diagnostics"]["counts"])
+        polyline, = self.entities()
+        self.assertEqual(list(polyline.get_points("xy")), [(0, 0), (10, 0)])
+
     def test_GE01_breakline_points(self):
         self.convert(LINE.replace("breakline line", "breakline point"))
         entities = self.entities()

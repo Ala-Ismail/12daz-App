@@ -20,8 +20,11 @@ Scope: the first release converts `.12daz` and `.12da` to 2D DXF 2018. DWG is ou
 | TR-10 CLI | Match GUI conversion semantics and return documented exit codes | CL-01 to CL-03 |
 | TR-11 Performance | Meet the agreed sample benchmark and resource limits without reducing output fidelity | PF-01 to PF-03 |
 | TR-12 Distribution | Run offline on a clean supported Windows x64 machine without Python, AutoCAD or 12d Model | PK-01 to PK-03 |
+| TR-13 Expanded geometry (planned) | Qualify expanded string families and reconstruct intersection-point alignments with tolerance-controlled horizontal and vertical curve sampling in the selected output mode | EG-01 to EG-12 |
 
 All cases are required for the enabled first-release feature set, except GE-12 to GE-14 and GE-08's optional symbol/TIN variants, which become required when those features are enabled. An unavailable optional feature must be handled by the unsupported-object path and reported accurately. Marking a required case Not applicable requires a documented scope change; it is not a passing result.
+
+TR-13 and EG-01 to EG-12 are conditional acceptance requirements for the expanded geometry plan in the design, not claims of implemented or tested support. They become mandatory for each enabled source variant and output mode. Existing zero-Z requirements apply to Flatten 2D; planned Keep Z output must instead satisfy the XYZ/profile assertions below. Keep Z does not permit nonzero thickness or unverified source elevations.
 
 ## Fixtures and expected results
 
@@ -35,6 +38,7 @@ Fixture groups:
 - F-GEOMETRY: isolated primitives, mixed Z, arc directions, closure, text, null values, degenerate and invalid geometry, large coordinates and units.
 - F-STYLES: model/layer collisions, forward style references, mixed colours and missing styles/fonts.
 - F-MIXED: supported, approximated and unsupported source objects with independently enumerated counts.
+- F-EXPANDED: verified 2D/3D/4D strings, super strings, polylines, existing contours, pipe centrelines and solved/intersection-point super alignments. Include documented arc, spiral and parabolic vertical-curve definitions, independent chainage-position/profile references and per-mode expected results. Record the fourth component's verified meaning, curve conventions and source-definition precedence.
 - F-SURVEY: the local sample identified in the design, supplemented with an authorized reference DXF when available. Its object inventory and expected counts must be established before it can be an acceptance fixture.
 
 ## Numerical and output assertions
@@ -87,6 +91,27 @@ Fixture groups:
 | ST-02 | Use distinct entity colours within one model | Supported overrides survive layer mapping |
 | ST-03 | Reference missing line style, font and symbol definitions | Documented fallback and source-linked diagnostic for each affected category |
 | ST-04 | Convert same fixture twice with same options | Canonical geometry, layer names and diagnostic totals reproducible |
+
+## Planned expanded geometry cases
+
+Use independent analytical results or reference geometry produced outside the converter. Declare plan and elevation tolerances in drawing units before execution. For sampled curves, verify maximum plan deviation and, in Keep Z mode, elevation error at corresponding chainages using an independent bound where available. A midpoint-only check or dense sampling alone cannot establish a guaranteed maximum; record any unresolved evidence limitation and do not claim bounded-accuracy acceptance without supporting evidence.
+
+| ID | Setup / action | Expected result |
+| --- | --- | --- |
+| EG-01 | Convert each qualified 2D, 3D and 4D string variant and polyline, including open/closed, reversed, repeated-vertex and intentional-gap cases | Ordering, breaks and closure preserved; Flatten 2D has zero Z; Keep Z preserves verified XYZ, including vertical segments. Fourth component is interpreted only by its verified semantics, with metadata mapping or omission reported; malformed records diagnosed |
+| EG-02 | Convert mixed straight/arc/spiral super strings with segment colours and attributes | Correct segment joins, direction and supported styling; exact circular representation retained where valid; non-circular segments meet tolerance; omitted attributes reported |
+| EG-03 | Convert existing open/closed contours at positive, negative and stacked elevations | Expected contour topology and XY retained; Keep Z preserves contour elevations; Flatten 2D has zero Z; no surface-derived contours invented |
+| EG-04 | Convert qualified pipe objects with varying invert/centreline definitions and missing elevations | Centreline follows the documented source elevation convention; no assumed invert-to-centreline offset; unresolved required Keep Z elevations skip the whole object; omitted diameter/connectivity/civil attributes reported |
+| EG-05 | Convert intersection-point super alignments with straights and clockwise/counterclockwise circular arcs | Reconstructed endpoints, centres, radii, tangent points, signed sweeps and positions at independent reference chainages match; intersection points are not exported as a substitute chord path |
+| EG-06 | Convert each qualified transition-spiral family in forward/reversed direction, including short transitions and transitions between straights/arcs | Independent chainage positions and tangents match verified source conventions; required joins are continuous; sampled plan deviation meets tolerance |
+| EG-07 | Combine horizontal straights/arcs/spirals with crest/sag parabolic vertical curves and grade changes | Keep Z matches independent elevations and grades at the same chainages, including vertical-curve boundaries and extrema; intermediate vertices capture a curved profile even along a straight plan segment; Flatten 2D retains horizontal geometry and reports vertical omission |
+| EG-08 | Export the same curves at several plan/elevation tolerances and drawing-unit declarations, including large survey coordinates | Independent error checks meet each requested tolerance; tighter settings do not worsen measured error; no coordinate rescaling from unit declaration; endpoints, curve boundaries and required extrema retained |
+| EG-09 | Supply missing/contradictory parameters, unknown curve families, missing Keep Z elevations and conflicting solved/intersection-point definitions | Documented precedence and consistency checks applied; unresolved objects skipped whole with specific source-linked diagnostics; no invented zero elevations, false chords or joins across missing segments |
+| EG-10 | Force subdivision/vertex limits, invalid tolerances and cancellation during sampling | Invalid settings rejected; limits produce whole-object skips with unmet-tolerance diagnostics; tolerance never silently relaxed; cancellation meets PF-02 and DX-05; no partial object published |
+| EG-11 | Reopen/audit output and independently inspect representative expanded fixtures in CAD | Planar sampled curves use expected LWPOLYLINE representation; varying-Z output uses 3D POLYLINE; actual WCS vertices, closure, connectivity and profiles match independent references within tolerance; exact arcs/bulges remain correct; clean audit alone is insufficient |
+| EG-12 | Run equivalent GUI/CLI exports, change mode/tolerance, simplify preview and inspect reports for mixed supported/unsupported objects | Options propagate consistently; stale preview/summary invalidated; preview simplification does not change export; report includes mode, tolerance, error method/bound or estimate, vertex counts, omitted attributes and source-linked skips; selected = exact + approximated + skipped; warning exit status applied |
+
+For TR-13 qualification, retain per-variant fixture provenance, source parameter conventions, independent reference calculations, error-verification method and CAD application/version with the result records. An unsupported variant must continue to use the reported skip path until its applicable cases pass.
 
 ## Output, reporting and CLI cases
 
@@ -142,7 +167,7 @@ Each result record must contain case ID, requirement ID, application commit/buil
 
 1. Freeze supported source variants, units policy, encodings and resource-limit settings, with fixture coverage for each advertised capability.
 2. Pass all applicable required cases and automated checks on the release artifact. Optional enabled features must pass their conditional cases.
-3. Resolve defects causing coordinate shifts, nonzero output Z, incorrect geometry, silent loss, input/output corruption or crashes before release. Record remaining lower-impact issues and acceptance rationale.
+3. Resolve defects causing coordinate shifts, nonzero output Z in Flatten 2D, incorrect elevations in enabled Keep Z output, incorrect geometry, unmet advertised approximation tolerances, silent loss, input/output corruption or crashes before release. Record remaining lower-impact issues and acceptance rationale.
 4. Complete independent CAD review and clean-machine offline installation checks.
 5. Confirm source-object reconciliation for the survey benchmark and publish measured performance. Agree or revise provisional PF targets before assessing release; do not relabel a failed run as passed by changing thresholds afterward.
 6. Publish the tested support matrix, known limitations and evidence summary. DWG support is not a release gate.

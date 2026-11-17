@@ -1,6 +1,6 @@
 # 12dAZ Converter
 
-Offline Windows desktop converter from **12daz / 12da to editable 2D DXF 2018**. Preserves source XY coordinates and supported circular arcs, flattens Z to zero and writes one layer per model. No 12d Model or AutoCAD installation is needed.
+Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
 Version **0.1.3** is an initial working implementation. Independent CAD comparison and clean-machine release qualification remain pending. Read the conversion report: unsupported geometry, omitted labels/metadata and style substitutions are explicitly reported. DWG remains future work.
 
@@ -20,7 +20,7 @@ The local build is `dist/12dAZ-Converter-0.1.3/12dAZ-Converter.exe`. Distribute 
 
 1. Open a `.12daz` or `.12da` file.
 2. Review models and preview; select the models to export.
-3. Choose drawing units and a `.dxf` destination. Declaring units does not rescale coordinates.
+3. Choose drawing units, **Flatten 2D** or **Keep Z** under **Geometry**, and a `.dxf` destination. Declaring units does not rescale coordinates. The preview shows the source plan in either mode.
 4. Select **Export DXF** and review warnings in **View report**. A `.dxf.conversion.json` report is saved beside the drawing.
 
 **Help** provides an offline User Guide, About dialog, MIT license and dependency notices. A brief startup splash includes optional support through PayPal; it closes automatically after about 1.8 seconds, or immediately with Continue, Enter or Escape. Help > About contains the same support link. Cancel requests safe cleanup before output publication.
@@ -41,20 +41,25 @@ Command line:
 ```powershell
 python run_cli.py inspect "survey.12daz" --report "inspect.json"
 python run_cli.py convert "survey.12daz" --output "survey_2D.dxf" --units metres
+python run_cli.py convert "survey.12daz" --output "survey_3D.dxf" --units metres --geometry-mode keep-z
 ```
 
 Repeat `--model "Model name"` to select models. Use `--overwrite` to replace existing drawing/report files, `--encoding cp1252` for a legacy no-BOM file, and `--max-expanded-mib` to change the default 1024 MiB expanded-input limit. Exit codes: 0 clean completion, 2 completion with warnings, 1 failure, 3 cancellation. A warning exit code can also indicate omitted attributes or a substituted style despite correct base plan geometry.
 
 ## Supported geometry and limits
 
-- Super strings with `data_2d`/`data_3d` and straight/circular segments from `radius_data` or `geometry_data`.
-- Legacy 2D/3D strings and legacy five-column polyline/super-string data.
-- XY arcs/circles, point strings and basic single-line world-size text.
-- Solved horizontal super-alignment geometry using supported segments; labels and civil semantics are omitted.
+| Source geometry | Flatten 2D (default) | Keep Z |
+| --- | --- | --- |
+| 2D/3D strings, super strings and legacy polylines | Exports straight segments and supported circular segments in XY. | Preserves known XYZ on straight strings and supports circular strings at a constant elevation. |
+| Point strings, standalone arcs and circles, and basic single-line world-size text | Exports supported entities in XY. | Keeps explicit source elevations. Arcs must have a constant elevation. |
+| Super alignments | Exports solved horizontal lines and circular arcs. If solved vertices are absent, it can reconstruct valid straight intersection-point layouts and valid open layouts with two fixed lines and a free-radius tangent arc. | Samples supported horizontal geometry against solved vertical grades and symmetric parabolas. A usable solved vertical profile is required. |
+| Drainage pipe spans | Exports one polyline per verified pipe span, retaining intermediate plan vertices. | Pending verification of the source pipe centreline elevations. |
 
-Drainage, TINs, meshes, transition curves, symbols, rendered annotations and paper/screen-size text are not implemented. An object with an unsupported curve is skipped whole. Custom colours, styles and fonts may be substituted with warnings. The polished three-panel GUI follows the design proposal with a dark grey theme and blue actions. The preview samples arcs and shares a 30,000-point display allowance across selected models, rebuilding in the background when selection changes; the DXF retains exact supported geometry without this preview cap. Units require user selection; there is no CRS transformation or automatic scaling.
+For Keep Z alignment sampling, **Plan tolerance** and **Elevation tolerance** each default to **0.01 drawing units**. Set them in the GUI or with `--plan-tolerance` and `--elevation-tolerance`. For active transitions with supported solved line-and-arc geometry, the report identifies that the export used the solved plan. Reconstruction of the original transition spirals is pending.
 
-On the supplied local sample, the converter writes 599 CAD entities from 500 source objects and reports 36 skipped objects. These counts are conversion observations, not an independent certification of source fidelity. See [validation status](docs/validation_status.md).
+**4D strings and contours are deferred.** TINs, meshes, symbols, rendered annotations and paper/screen-size text are unsupported. The report identifies skipped objects, omitted alignment labels and drainage attributes, and style substitutions. The GUI preview shares a 30,000-point display allowance across selected models. Export uses the selected geometry and tolerances independently of that allowance.
+
+Local sample checks found 91 convertible Keep Z alignments and reopened and audited 103 Flatten 2D pipe spans. See [validation status](docs/validation_status.md).
 
 ## Test and build
 

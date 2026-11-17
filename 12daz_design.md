@@ -321,6 +321,76 @@ A temporary writer-only check using the installed **ezdxf 1.3.5** created and re
 
 This establishes availability of the basic writer APIs in the pinned dependency. It does **not** test a Keep Z converter path, source-Z interpretation, rising curves, CAD interoperability or clean-machine distribution. No application or website behaviour changes as part of this feasibility documentation.
 
+## Planned expanded string and non-circular geometry support
+
+This is a proposed implementation scope, not a statement of current support. Extend conversion to **2D, 3D and 4D strings, super strings, polylines, contours, pipes and super alignments**. Alignments defined by intersection points must be reconstructed and sampled through their circular arcs, transition spirals and parabolic vertical curves so the DXF follows the design geometry within an explicit approximation tolerance. Do not replace an unsupported curve with a straight chord or treat intersection points as the finished alignment.
+
+### Source interpretation and output policy
+
+| Source object | Planned conversion |
+| --- | --- |
+| 2D strings and polylines | Preserve vertices, ordering, breaks and closure; evaluate any supported curved segments before export. |
+| 3D strings | Preserve source XYZ in Keep Z mode; export the corresponding plan geometry in Flatten 2D mode. |
+| 4D strings | Verify the source record layout and meaning of the fourth component against documented fixtures. Preserve XYZ where defined and record the additional component as metadata where a verified mapping exists; do not reinterpret it as another spatial axis. |
+| Super strings | Support mixed straight, circular and verified non-circular segments, including segment attributes and colours. Preserve exact circular representations where valid; sample other supported curves. |
+| Contours | Export existing contour strings with closure and elevation preserved in Keep Z mode, or flattened in 2D mode. Generating contours from a TIN remains separate work. |
+| Pipes | Export verified pipe centreline geometry and source elevations where available. Report omitted diameter, connectivity and other civil attributes; pipe solids and network reconstruction are outside this increment. |
+| Super alignments | Support both solved geometry and verified intersection-point definitions. Reconstruct horizontal straights, arcs and transition spirals together with the vertical profile, including parabolic vertical curves. |
+
+Source variants and parameters must be researched and qualified with fixtures before enabling each type. Do not assume every transition is a clothoid or every vertical curve uses the same parameter convention. Resolve curve direction, chainage, units, tangent constraints and profile conventions from verified source semantics. If solved and intersection-point definitions coexist, establish and document their precedence and check them for inconsistencies.
+
+### Alignment evaluation and sampling
+
+1. Build a shared evaluator that returns plan position and, where known, elevation at a source chainage. Reconstruct the horizontal alignment from intersection points and its curve parameters, rather than joining the intersection points directly.
+2. Evaluate straight, circular and verified spiral segments using their actual definitions. Evaluate parabolic vertical curves over their defined chainage intervals and combine the resulting elevation with the horizontal position at the same chainage. Retain ordinary source vertices and explicit discontinuities.
+3. Sample adaptively using a user-selected maximum deviation in the selected drawing units. Define separate plan and elevation error checks for Keep Z mode; a flat plan segment can still need intermediate points to represent its vertical curve. Subdivision acceptance must use a curve-specific error bound or a verified conservative method, rather than relying only on a midpoint check.
+4. Include segment endpoints, horizontal and vertical curve boundaries, and required geometric extrema. Preserve continuity where the source specifies it, closure, direction and chainage order. Split at intentional gaps; never connect across missing geometry.
+5. Write sampled planar geometry as LWPOLYLINE and varying-elevation geometry as 3D POLYLINE. Preserve exact circles/arcs and valid constant-elevation bulges when the chosen output representation permits them. Flatten 2D evaluates horizontal geometry only and explicitly reports omitted vertical information; Keep Z requires verified elevations.
+
+Approximation must have finite subdivision, vertex and cancellation limits. If the requested accuracy cannot be achieved within those limits, skip the whole source object with a diagnostic; do not silently relax tolerance or publish a partial alignment. Missing required parameters, unsupported curve families, inconsistent definitions and unresolved Keep Z elevations also skip the whole object with a specific reason. Existing whole-object skip behaviour remains until each evaluator is qualified.
+
+### Delivery, reporting and acceptance
+
+Implement in stages: first qualify source layouts and add a segment/profile representation; next add curve evaluators and tolerance-controlled sampling; then integrate the DXF writer, preview, GUI/CLI options and conversion reports. Enable support per verified source variant. Preview may simplify the evaluated result separately, while export must meet the selected tolerance.
+
+Expose curve tolerance only when approximation is implemented. Reports must identify source type, exact versus sampled output, output dimensional mode, requested tolerance, validated error bound or estimate and its method, generated vertex counts, omitted attributes and skip reasons. Distinguish an estimated error from a proven bound. Account for each selected source object as exported exactly, approximated or skipped.
+
+Acceptance fixtures must cover all listed string families, mixed straight/arc/spiral super strings, contour closure/elevation, pipe centreline elevations, and intersection-point alignments with horizontal transitions and parabolic vertical curves. Check positions at independent reference chainages, endpoints, tangent continuity where specified, vertical grades, curve extrema and approximation error against analytical or independently generated reference geometry. Include reversed direction, large coordinates, unit changes, short/degenerate segments, missing parameters, malformed fourth components, missing elevations and sampling-limit failures. Reopen DXF output to verify XY/XYZ vertices, closure and entity types; independently inspect representative drawings in CAD. Verify that Flatten 2D produces zero Z and that Keep Z preserves the evaluated profile within tolerance.
+
+### Implementation steps
+
+4D strings and existing contours are deferred until genuine source records are available. Keep Z can sample solved horizontal lines and circular arcs against solved vertical grades and symmetric parabolas. Plan and elevation tolerances default to 0.01 drawing units and can be set separately in the GUI or using `--plan-tolerance` and `--elevation-tolerance`. The six local archives yielded 91 convertible alignments on inspection.
+
+The local `spiral` blocks are zero-length defaults. Active compound transitions refer to other geometry or appear within mixed part sequences, and their exported solved plans use line and circular arc segments. Conversion reports when it uses a solved plan for an active transition. Tolerance applies to sampling that solved representation. Qualifying an original spiral evaluator still requires a nonzero definition with enough geometric constraints and an independent reference.
+
+For straight alignments explicitly marked horizontally valid and IP-only, the converter checks the IP sequence and closure against the solved plan when present. If solved vertices are absent, it reconstructs the plan from the IP records. All 17 straight IP examples in the local archives matched their solved vertices exactly, including four closed plans.
+
+For valid open alignments with a fixed line, a free-radius arc and a second fixed line, the converter can reconstruct the minor tangent arc when solved vertices are absent. It honours signed radii, fixed-line offsets and hidden tangent lines. The reconstruction matched the solved vertices and bulges of all six examples of this layout within 0.000001 drawing units for positions and 0.000001 for bulges. Other curved layouts and spiral evaluation remain pending.
+
+Flatten 2D exports solved drainage pipe spans as one polyline per consecutive pit pair, including intermediate plan vertices. The converter checks the pit indices, pipe count and pit XY against the solved drainage vertices before exporting. Reports identify the omitted elevations, dimensions, pit structures and hydraulic attributes. Keep Z remains pending verification of the pipe centreline elevation convention.
+
+The GUI Geometry selector and CLI `--geometry-mode keep-z` support elevation preservation for qualified straight strings, points, basic text and constant-elevation circular geometry with explicit source elevations. Flatten 2D remains the default and the GUI preview shows the source plan in either mode. A DXF round-trip test checks the exported elevations. The synthetic fixture documents the expanded source layouts that need verification against a 12d Model export.
+
+The following steps are planned work. Complete them in dependency order; qualify and enable individual source variants incrementally rather than advertising the entire scope after the first parser change. Acceptance IDs refer to [test requirements](docs/test_requirements.md).
+
+1. **Establish source fixtures and conventions.** Inventory the current unsupported types and collect permitted, minimal examples for every proposed string family and alignment definition. Document record layouts, null values, fourth-component semantics, pipe elevation conventions, spiral parameters, vertical-curve definitions and solved-versus-intersection-point precedence. Create independent expected chainage/XYZ results and fixture manifests before implementing evaluators. Deliverable: a source-variant support matrix and F-EXPANDED fixtures supporting EG-01 to EG-09; unverified variants remain disabled.
+
+2. **Introduce a dimensional segment/profile model.** Extend the representation currently in `src/az12_converter/geometry.py` to retain XYZ, missing-elevation state, source references, chainage intervals, breaks, closure and segment styling. Represent horizontal straight/arc/spiral segments and vertical grade/parabola intervals separately, with fourth-component metadata where verified. Keep exact and sampled primitives distinguishable. Integrate the proposed Keep Z foundation before enabling elevated output. Deliverable: mode-aware geometry contracts with EG-01, EG-02 and EG-07 coverage, retaining the existing flattened-output checks.
+
+3. **Parse and normalize expanded objects.** Extend `parser.py` and geometry normalization for qualified 2D/3D/4D strings, super strings, polylines, existing contours and pipe centrelines. Retain sufficient source data for later evaluation instead of flattening during parsing. Validate dimensionality, finite coordinates, required fields and intentional gaps; apply verified pipe elevation semantics and record omitted civil attributes. Deliverable: source-to-normalized-object checks for EG-01 to EG-04 and rejection fixtures from EG-09.
+
+4. **Reconstruct horizontal alignments.** Add testable horizontal evaluators, in focused modules if needed, for solved geometry and intersection-point definitions. Resolve tangent points, arc centres/directions, transition lengths, chainage origins and source-defined chainage discontinuities. Implement only verified spiral families. Check consistency when multiple definitions coexist and expose position/tangent evaluation at chainage. Deliverable: independent analytic/reference checks passing EG-05 and EG-06, including reversed direction and degenerate inputs.
+
+5. **Evaluate and combine vertical profiles.** Implement source-defined grade intervals and parabolic vertical curves, including crest/sag extrema and profile boundaries. Combine elevation and plan position at the same source chainage, preserving missing-profile state. Flatten 2D must still work from valid horizontal data when vertical data is unsupported, with an omission diagnostic; Keep Z must skip objects requiring unresolved elevations. Deliverable: independently verified positions and grades for EG-07 and missing/inconsistent-profile cases in EG-09.
+
+6. **Implement bounded adaptive sampling.** Add separate plan/elevation tolerances in drawing units and curve-specific conservative error checks. Partition at horizontal/vertical boundaries, extrema, gaps and source discontinuities before subdivision. Preserve exact representations where valid. Enforce finite subdivision and per-object/job vertex limits, check cancellation during evaluation, and stage each object's result until its complete geometry passes. Deliverable: EG-08 and EG-10 pass without silent tolerance relaxation or partial-object emission.
+
+7. **Integrate DXF output and validation.** Extend `export/dxf.py` for planar sampled LWPOLYLINE, varying-Z 3D POLYLINE and eligible exact elevated entities. Preserve segment styling when splitting entities and retain one source-object accounting record. Make pre-publication validation mode-aware: zero Z for Flatten 2D, independently expected XYZ/profile checks for Keep Z, and correct closure/entity types for both. Deliverable: EG-11, applicable GE/DX regression cases and atomic publication/cancellation checks pass.
+
+8. **Connect options, preview and reports.** Carry geometry mode, tolerances and sampling limits through `service.py`, `worker.py`, `cli.py` and `app.py`; expose only implemented choices and validate them before conversion. Update `preview.py` to consume evaluated geometry with separately labelled display simplification. Invalidate stale previews and summaries when settings change. Record exact/approximated/skipped source counts, sampling method/error evidence, generated vertices and omitted attributes in reports. Deliverable: EG-12, GUI/CLI parity and report reconciliation pass.
+
+9. **Qualify and release each supported variant.** Run applicable EG-01 to EG-12 cases, existing regression checks, sampling performance/cancellation checks, independent CAD inspection and packaged offline smoke checks. Update `docs/validation_status.md`, the tested support matrix and bundled user guide with measured results and limitations. Enable a variant only after its parser, evaluator, writer and selected dimensional mode pass their acceptance cases; retain explicit skips for remaining variants.
+
 ## GUI concept provenance
 
 Generated using the built-in image generation tool with the imagegen skill. Image: `docs/assets/12daz-converter-gui-proposal.png`. The exact generation prompt is saved in `docs/assets/12daz-converter-gui-prompt.txt`. The image depicts sample values and a proposed interface, not running software.

@@ -87,7 +87,9 @@ These checks do not establish SignPath approval, server-side configuration, a va
 
 ## Deferred scope and release checks
 
-DWG, TIN/mesh export, drainage plan representations, transition approximation, custom symbols, rendered labels, external style definitions, paper/screen-size text and text offset/raise placement remain unsupported or deferred. Unsupported curves are reported rather than replaced by false straight segments. Drag-and-drop input is not implemented. The GUI excludes unsupported-only models by default; CLI inspection reports all source objects.
+DWG, TIN/mesh export, transition approximation, custom symbols, rendered labels, external style definitions, paper/screen-size text and text offset/raise placement remain unsupported or deferred. Unsupported curves are reported rather than replaced by false straight segments. Drag-and-drop input is not implemented. The GUI excludes unsupported-only models by default; CLI inspection reports all source objects.
+
+Flatten 2D drainage qualification reopened and audited 103 zero-elevation pipe polylines from 51 local drainage strings. The other 11 strings had no pipe blocks. Drainage Keep Z remains unsupported pending verification of the centreline elevations.
 
 Complete the remaining applicable checks above, independently review reference drawings and meet the release gates before calling this a qualified release. The 77 passing executable tests do not imply all 59 acceptance-case rows have passed in full.
 

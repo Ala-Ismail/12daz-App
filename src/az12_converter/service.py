@@ -2,6 +2,7 @@
 from collections import Counter
 from dataclasses import dataclass, asdict
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -22,6 +23,9 @@ class Options:
     models: list[str] | None = None
     overwrite: bool = False
     encoding: str | None = None
+    geometry_mode: str = "flatten-2d"
+    plan_tolerance: float = 0.01
+    elevation_tolerance: float = 0.01
 
 
 class Diagnostics:
@@ -88,6 +92,12 @@ def publish(temp, output, overwrite):
 
 
 def _job(path, options, *, output=None, report_path=None, limits=Limits(), cancel=None, progress=None, preview_limit=30000):
+    if options.geometry_mode not in {"flatten-2d", "keep-z"}:
+        raise ConversionError("Unknown output geometry mode.")
+    keep_z = options.geometry_mode == "keep-z"
+    for label, value in (("Plan", options.plan_tolerance), ("Elevation", options.elevation_tolerance)):
+        if not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise ConversionError(f"{label} tolerance must be a positive finite number in drawing units.")
     start = time.perf_counter()
     source_path = Path(path)
     if output:
@@ -129,7 +139,8 @@ def _job(path, options, *, output=None, report_path=None, limits=Limits(), cance
                 diagnostics.add(code, message, entity)
 
             try:
-                geometry = convert_geometry(entity, warn)
+                geometry = convert_geometry(entity, warn, keep_z, cancel, plan_tolerance=options.plan_tolerance,
+                                            elevation_tolerance=options.elevation_tolerance)
             except UnsupportedGeometry as exc:
                 skipped += 1
                 warn("UNSUPPORTED_OR_INVALID_GEOMETRY", str(exc))
@@ -185,7 +196,7 @@ def _job(path, options, *, output=None, report_path=None, limits=Limits(), cance
             checkpoint(cancel)
             writer.save(temp)
             from .export.dxf import validate_dxf
-            validate_dxf(temp, writer.count, cancel)
+            validate_dxf(temp, writer.count, cancel, **({"keep_z": True} if keep_z else {}))
             checkpoint(cancel)  # The final cancellable boundary, immediately before commit.
             publish(temp, Path(output), options.overwrite)
             result["published"] = True

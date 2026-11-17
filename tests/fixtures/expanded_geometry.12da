@@ -1,0 +1,66 @@
+// Synthetic fixture, coordinates in metres. See expanded_geometry.md.
+model "Baseline strings"
+string 2d {
+  name "Open 2D"
+  breakline line
+  data_2d { 0 0 10 0 10 5 }
+}
+string 3d {
+  name "Vertical then sloped"
+  breakline line
+  data_3d { 0 10 -2 0 10 3 10 10 5 }
+}
+string polyline {
+  name "Legacy polyline with circular arc"
+  breakline line
+  data { 0 20 5 -10 F 10 20 9 0 F }
+}
+
+model "Expanded strings"
+// Proposed layouts for 4d, contour and pipe.
+string 4d {
+  name "XYZ plus sample measure"
+  data_4d { 0 30 5 100 10 30 6 112 }
+}
+string contour {
+  name "Closed contour at 12.5"
+  closed 1
+  data_3d { 0 40 12.5 10 40 12.5 10 50 12.5 0 50 12.5 }
+}
+string pipe {
+  name "Sloping centreline"
+  data_3d { 0 60 -1 10 60 -2 20 65 -3 }
+}
+string super {
+  name "Straight arc and transition"
+  breakline line
+  data_2d { 0 100 10 100 20 110 19.666904686 119.990004629 }
+  geometry_data {
+    straight {}
+    arc { radius -10 major 0 }
+    spiral { length 10 start_curvature 0 end_curvature 0.02 }
+  }
+}
+
+model "Alignments"
+string super_alignment {
+  name "Solved horizontal"
+  horizontal_data {
+    breakline line
+    data_2d { 0 200 20 200 }
+  }
+}
+// Proposed layout for an intersection-point alignment and profile.
+string super_alignment {
+  name "Intersection point with transitions and sag"
+  horizontal_parts {
+    intersection_point { x 0 y 300 }
+    intersection_point { x 100 y 300 radius 20 entry_spiral 10 exit_spiral 10 }
+    intersection_point { x 100 y 400 }
+  }
+  vertical_parts {
+    grade { start_chainage 0 end_chainage 40 start_z 11 grade -0.025 }
+    parabola { start_chainage 40 length 40 start_z 10 start_grade -0.025 end_grade 0.025 }
+    grade { start_chainage 80 start_z 10 grade 0.025 }
+  }
+}

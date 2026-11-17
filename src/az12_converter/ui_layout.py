@@ -263,19 +263,31 @@ def build_layout(app):
     app.format_combo = form_row(0, 'DXF version', app.format_var, ['DXF 2018'])
     app.unit_combo = form_row(1, 'Units', app.units, ['metres', 'millimetres', 'feet', 'inches'])
     app.layer_combo = form_row(2, 'Layers', app.layer_var, ['One per model'])
+    app.geometry_combo = form_row(3, 'Geometry', app.geometry_mode, ['Flatten 2D', 'Keep Z'])
+    app.geometry_combo.bind('<<ComboboxSelected>>', app.geometry_changed)
+    app.tolerance_entries = []
+    for row, label, variable in ((4, 'Plan tolerance', app.plan_tolerance),
+                                 (5, 'Elevation tolerance', app.elevation_tolerance)):
+        ttk.Label(form, text=label, style='Card.TLabel').grid(row=row, column=0, sticky='w', pady=px(6))
+        entry = ttk.Entry(form, textvariable=variable, width=16)
+        entry.grid(row=row, column=1, sticky='ew', pady=px(6))
+        app.tolerance_entries.append(entry)
+    ttk.Label(form, text='Keep Z alignment tolerances are in drawing units.', style='Muted.TLabel',
+              wraplength=px(260)).grid(row=6, column=0, columnspan=2, sticky='w', pady=(px(7), 0))
     ttk.Label(form, text='Units are declared; coordinates stay unchanged.', style='Muted.TLabel',
-              wraplength=px(260)).grid(row=3, column=0, columnspan=2, sticky='w', pady=(px(7), 0))
+              wraplength=px(260)).grid(row=7, column=0, columnspan=2, sticky='w', pady=(px(7), 0))
     ttk.Separator(settings).pack(fill='x', padx=px(16), pady=px(5))
     summary = ttk.Frame(settings, style='Card.TFrame', padding=(px(16), px(10)))
     summary.pack(fill='x')
     ttk.Label(summary, text='Export summary', style='Heading.TLabel').pack(anchor='w', pady=(0, px(12)))
     plan_badge = tk.Frame(summary, background='#393f49', highlightthickness=1, highlightbackground='#4a515e')
     plan_badge.pack(fill='x')
-    tk.Label(plan_badge, text='Plan view  ·  Z = 0', background='#393f49', foreground='#dce5f2',
+    tk.Label(plan_badge, textvariable=app.geometry_mode, background='#393f49', foreground='#dce5f2',
              font=('Segoe UI', 11), anchor='w', padx=px(12), pady=px(9)).pack(fill='x')
     ttk.Label(summary, text='Preserve circular arcs', image=app.icons['checked'], compound='left',
               style='Card.TLabel', padding=(0, px(13), 0, px(5))).pack(anchor='w')
-    ttk.Label(summary, text='Source XY geometry · exact supported curves', style='Muted.TLabel', wraplength=px(260)).pack(anchor='w')
+    ttk.Label(summary, text='Preview shows the source plan. Keep Z requires known elevations.',
+              style='Muted.TLabel', wraplength=px(260)).pack(anchor='w')
     ttk.Separator(settings).pack(fill='x', padx=px(16), pady=px(5))
     destination = ttk.Frame(settings, style='Card.TFrame', padding=(px(16), px(10)))
     destination.pack(fill='x')
