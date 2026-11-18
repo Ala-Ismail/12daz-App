@@ -20,8 +20,10 @@ def main(argv=None):
         sub.add_argument("--model", action="append", dest="models", help="Select model by exact name; repeat to select several")
         sub.add_argument("--overwrite", action="store_true")
         sub.add_argument("--geometry-mode", choices=["flatten-2d", "keep-z"], default="flatten-2d")
-        sub.add_argument("--plan-tolerance", type=float, default=0.01, help="Keep Z alignment plan tolerance in drawing units")
+        sub.add_argument("--plan-tolerance", type=float, default=0.01, help="Keep Z curve plan tolerance in drawing units")
         sub.add_argument("--elevation-tolerance", type=float, default=0.01, help="Keep Z alignment elevation tolerance in drawing units")
+        sub.add_argument("--linear-arc-elevations", action="store_true",
+                         help="In Keep Z, sample circular strings assuming a linear grade between known endpoint elevations")
         sub.add_argument("--max-expanded-mib", type=int, default=1024)
         if name == "convert":
             sub.add_argument("--output", required=True)
@@ -31,7 +33,8 @@ def main(argv=None):
         parser.error("--max-expanded-mib must be positive")
     options = Options(units=getattr(args, "units", None), models=args.models, overwrite=args.overwrite,
                       encoding=args.encoding, geometry_mode=args.geometry_mode,
-                      plan_tolerance=args.plan_tolerance, elevation_tolerance=args.elevation_tolerance)
+                      plan_tolerance=args.plan_tolerance, elevation_tolerance=args.elevation_tolerance,
+                      linear_arc_elevations=args.linear_arc_elevations)
     try:
         kwargs = {"limits": Limits(expanded_bytes=args.max_expanded_mib * 1024 * 1024), "report_path": args.report, "preview_limit": 0}
         if args.command == "inspect":

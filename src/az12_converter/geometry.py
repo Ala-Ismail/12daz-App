@@ -388,7 +388,59 @@ def drainage_plan(source, warn, keep_z, cancel):
     return result
 
 
-def convert_geometry(source, warn, keep_z=False, cancel=None, *, plan_tolerance=0.01, elevation_tolerance=0.01):
+def sample_elevated_string(primitive, colours, tolerance, warn, cancel):
+    """Sample arcs on a linear grade and keep level arcs in planar runs."""
+    points, levels = primitive.points, primitive.elevations
+    edge_count = len(points) if primitive.closed else len(points) - 1
+    runs = []
+    added = 0
+    previous_key = None
+    for i in range(edge_count):
+        checkpoint(cancel)
+        j = (i + 1) % len(points)
+        a, b = points[i], points[j]
+        za, zb = levels[i], levels[j]
+        bulge = primitive.bulges[i]
+        colour = colours[i] if colours else primitive.colour
+        level_arc = bulge and za == zb
+        key = (colour, za if level_arc else None)
+        if key != previous_key:
+            run = Primitive("polyline", [a], colour=colour, style=primitive.style, elevations=[za])
+            runs.append(run)
+            previous_key = key
+        if bulge and not level_arc:
+            centre, radius, start, sweep = arc_parameters(a, b, bulge)
+            # Arc-length parameterization bounds chord error by radius * angle_step² / 8.
+            needed = abs(sweep) * math.sqrt(radius / 8 / tolerance)
+            if not math.isfinite(needed) or needed > 100_000 - added + 1:
+                raise UnsupportedGeometry("Elevated arc sampling exceeds the vertex limit at the requested tolerance.")
+            steps = max(2, math.ceil(needed))
+            added += steps - 1
+            if added > 100_000:
+                raise UnsupportedGeometry("Elevated arc sampling exceeds the vertex limit at the requested tolerance.")
+            for step in range(1, steps):
+                checkpoint(cancel)
+                fraction = step / steps
+                angle = start + fraction * sweep
+                run.points.append((centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle)))
+                run.elevations.append(za * (1 - fraction) + zb * fraction)
+                run.bulges.append(0.0)
+            bulge = 0.0
+        run.points.append(b)
+        run.elevations.append(zb)
+        run.bulges.append(bulge)
+    if primitive.closed and len(runs) == 1:
+        run.closed = True
+        run.points.pop()
+        run.elevations.pop()
+    if added:
+        warn("ELEVATED_ARC_SAMPLED", f"Added {added} vertices at plan tolerance {tolerance:g} drawing units "
+             "using a chord error bound. Elevations assume a linear grade between source endpoints along each arc.")
+    return runs
+
+
+def convert_geometry(source, warn, keep_z=False, cancel=None, *, plan_tolerance=0.01, elevation_tolerance=0.01,
+                     linear_arc_elevations=False):
     if source.kind == "drainage":
         return drainage_plan(source, warn, keep_z, cancel)
     if source.kind not in {"super_alignment", "super", "2d", "3d", "polyline", "arc", "circle", "text"}:
@@ -518,7 +570,10 @@ def convert_geometry(source, warn, keep_z=False, cancel=None, *, plan_tolerance=
         if keep_z:
             levels = [elevation(scalar(props, key, None)) for key in ("zcentre", "zstart", "zend")]
             if len(set(levels)) != 1:
-                raise UnsupportedGeometry("Keep Z does not support arcs with varying elevations.")
+                if not linear_arc_elevations or levels[1] == levels[2]:
+                    raise UnsupportedGeometry("Keep Z requires a level arc or the linear arc elevation option with differing endpoint elevations.")
+                arc = Primitive("polyline", [a, b], [math.tan(sweep / 4), 0], elevations=levels[1:], **common)
+                return sample_elevated_string(arc, None, plan_tolerance, warn, cancel)
             common["elevations"] = levels[1:]
         return [Primitive("polyline", [a, b], [math.tan(sweep / 4), 0], **common)]
 
@@ -584,8 +639,6 @@ def convert_geometry(source, warn, keep_z=False, cancel=None, *, plan_tolerance=
         if len(radii) not in {nsegments, len(points)} or len(majors) != len(radii):
             raise UnsupportedGeometry("Radius/major count mismatch.")
     bulges = [0.] * len(points)
-    if levels and len(set(levels)) > 1 and any(radii[:nsegments]):
-        raise UnsupportedGeometry("Keep Z does not support curved strings with varying elevations.")
     for i in range(max(0, nsegments)):
         if positions[i] == positions[(i + 1) % len(points)]:
             warn("DEGENERATE_SEGMENT", "Repeated vertices create a collapsed segment.")
@@ -597,9 +650,14 @@ def convert_geometry(source, warn, keep_z=False, cancel=None, *, plan_tolerance=
             return [Primitive("point", [p], elevations=[z], **common) for p, z in dict.fromkeys(positions)]
         return [Primitive("point", [p], **common) for p in dict.fromkeys(points)]
     colours = block_values(props["colour_data"]) if "colour_data" in props else None
+    if colours and len(colours) not in {nsegments, len(points)}:
+        raise UnsupportedGeometry("Segment colour count mismatch.")
+    if levels and len(set(levels)) > 1 and any(bulges):
+        if not linear_arc_elevations:
+            raise UnsupportedGeometry("Enable linear arc elevations to export curved strings with varying elevations in Keep Z.")
+        path = Primitive("polyline", points, bulges, closed, elevations=levels, **common)
+        return sample_elevated_string(path, colours, plan_tolerance, warn, cancel)
     if colours:
-        if len(colours) not in {nsegments, len(points)}:
-            raise UnsupportedGeometry("Segment colour count mismatch.")
         if len(set(colours[:nsegments])) > 1 or colours[0] != colour:
             return [Primitive("polyline", [points[i], points[j]], [bulges[i], 0], colour=colours[i], style=style,
                               elevations=[levels[i], levels[j]] if levels else [])

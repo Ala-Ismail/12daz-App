@@ -56,6 +56,18 @@ Version 0.1.2 keeps the proposal's three-panel layout and uses the requested dar
 
 The preview shares its 30,000-point allowance across selected models. Checkbox changes trigger a debounced background rebuild, with obsolete results discarded. Selecting one model makes the full allowance available to that model; full-geometry export remains independent of display sampling.
 
+### Preview point selection
+
+The initial preview selects points according to how they affect the visible drawing:
+
+1. **Preserve path structure.** Keep the endpoints of open paths. For closed outlines, retain at least three distinct vertices and the closing edge when an outline can be shown. Preserve intentional gaps.
+2. **Spend points on shape.** Rank candidate vertices by the deviation from the simplified path. Allocate more points to sharp bends and tight curves, using two endpoints for straight runs where possible. Use deterministic tie breaking.
+3. **Spread coverage across the drawing.** When the budget cannot represent every path or standalone point, group features by spatial tile and distribute the allowance across occupied tiles. Give each selected model a share where the budget permits, then redistribute unused points from small models to those with remaining detail.
+
+The collector compacts candidates in batches as geometry streams in and limits the displayed result to 30,000 points. It uses a spatial tile for each feature based on its first display point. Tests cover dense and sparse models, sharp bends, closed outlines, isolated features and independence from DXF export. The GUI labels simplified previews.
+
+A later increment can refine detail for the visible area after zoom or pan, using the existing background refresh and stale-result handling. Keep the full selected extents available for Fit.
+
 ## Proposed GUI
 
 ![Proposed 12dAZ Converter desktop interface](docs/assets/12daz-converter-gui-proposal.png)
@@ -282,7 +294,7 @@ The initial preview can remain an XY plan projection, labelled **Plan preview â€
 | Horizontal string at one known elevation, including circular segments | `LWPOLYLINE` with XY/bulges and its constant elevation | A planar lightweight polyline cannot hold a different Z for each vertex. |
 | Horizontal circle or arc with verified constant Z | `CIRCLE`/`ARC` with elevation, or elevated bulged polyline | Check centre/end Z consistency and preserve sweep/direction. |
 | Supported basic horizontal text | `TEXT` with source Z at insertion/alignment points | Existing font/placement restrictions remain; no implied support for tilted or offset text. |
-| Circular plan segment whose endpoint elevations differ | Initially skip the source object with a specific diagnostic | A 3D polyline has straight segments; copying a bulge cannot encode an exact rising circular-plan curve. |
+| Circular plan segment whose endpoint elevations differ | Sample to a 3D polyline when the user enables the linear-grade assumption. Otherwise report a skip. | Use the source XY arc and known endpoint elevations. Sample to the requested plan tolerance. |
 | Tilted planar circle/arc | Defer until plane/orientation data is parsed and verified | Requires correct object coordinate system (OCS), normal and world coordinate system (WCS) transforms. |
 | Super-alignment requiring a vertical profile | Defer or skip in Keep Z mode unless verified source elevations are available | Do not label horizontal-only geometry as preserved 3D. |
 | TIN, mesh, drainage and other currently unsupported objects | Remain unsupported | Keeping Z is an elevation-preservation feature, not solid/surface or civil-model reconstruction. |
@@ -358,6 +370,10 @@ Expose curve tolerance only when approximation is implemented. Reports must iden
 Acceptance fixtures must cover all listed string families, mixed straight/arc/spiral super strings, contour closure/elevation, pipe centreline elevations, and intersection-point alignments with horizontal transitions and parabolic vertical curves. Check positions at independent reference chainages, endpoints, tangent continuity where specified, vertical grades, curve extrema and approximation error against analytical or independently generated reference geometry. Include reversed direction, large coordinates, unit changes, short/degenerate segments, missing parameters, malformed fourth components, missing elevations and sampling-limit failures. Reopen DXF output to verify XY/XYZ vertices, closure and entity types; independently inspect representative drawings in CAD. Verify that Flatten 2D produces zero Z and that Keep Z preserves the evaluated profile within tolerance.
 
 ### Implementation steps
+
+**Circular strings with varying elevations.** In Keep Z, enable **Assume linear grade on arcs** or pass `--linear-arc-elevations` to sample supported circular segments with differing endpoint elevations. The option defaults to off. The evaluator follows the signed XY arc and interpolates Z by distance along it. This assumption supplies a linear profile, so the elevation tolerance used for solved alignment profiles does not govern these arcs. The plan tolerance bounds the XY chord deviation using the arc radius and angular step.
+
+Keep the source XYZ endpoints, segment colours and closing edge. Store sampled arcs in 3D polylines and retain level arcs as exact bulges in separate planar runs where needed. Cap the number of added vertices per object and check cancellation during sampling. Missing required elevations or a tolerance that exceeds the sampling budget cause a reported whole-object skip. Report the assumed grade, plan tolerance and added vertex count for sampled objects.
 
 4D strings and existing contours are deferred until genuine source records are available. Keep Z can sample solved horizontal lines and circular arcs against solved vertical grades and symmetric parabolas. Plan and elevation tolerances default to 0.01 drawing units and can be set separately in the GUI or using `--plan-tolerance` and `--elevation-tolerance`. The six local archives yielded 91 convertible alignments on inspection.
 

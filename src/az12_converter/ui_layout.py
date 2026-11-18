@@ -51,7 +51,6 @@ def configure_styles(app):
     style.configure('Card.TLabel', background=PANEL)
     style.configure('Muted.TLabel', background=PANEL, foreground=MUTED, font=('Segoe UI', 9))
     style.configure('Title.TLabel', font=('Segoe UI', 21, 'bold'))
-    style.configure('Subtitle.TLabel', foreground='#b4bfce', font=('Segoe UI', 12))
     style.configure('Heading.TLabel', background=PANEL, font=('Segoe UI', 12, 'bold'))
     style.configure('Status.TLabel', background=PANEL, font=('Segoe UI', 11, 'bold'))
     style.configure('TButton', padding=(12, 8), relief='flat', borderwidth=1,
@@ -117,7 +116,7 @@ def build_layout(app):
     scale = max(1, root.winfo_fpixels('1i') / 96)
     px = lambda n: round(n * scale)
     root.columnconfigure(0, weight=1)
-    root.rowconfigure(3, weight=1)
+    root.rowconfigure(2, weight=1)
     app.zoom_percent = tk.StringVar(value='100%')
     app.selection_status = tk.StringVar(value='No models selected')
     app.status_heading = tk.StringVar(value='Open a file to begin')
@@ -135,27 +134,22 @@ def build_layout(app):
     root.bind('<Alt-h>', lambda e: post_menu(app.help_menu, app.help_menu_button))
     root.bind('<Map>', lambda e: dark_titlebar(root) if e.widget == root else None, add='+')
 
-    # Header and full-width file bar mirror the original desktop concept.
     header = ttk.Frame(root, padding=(px(18), px(12), px(18), px(10)))
     header.grid(row=1, column=0, sticky='ew')
     ttk.Label(header, image=app.icons['logo']).pack(side='left', padx=(0, px(12)))
     ttk.Label(header, text='12dAZ Converter', style='Title.TLabel').pack(side='left')
     ttk.Separator(header, orient='vertical').pack(side='left', fill='y', padx=px(20), pady=px(5))
-    ttk.Label(header, text='12daz to 2D DXF', style='Subtitle.TLabel').pack(side='left')
-
-    toolbar = ttk.Frame(root, padding=(px(18), 0, px(18), px(15)))
-    toolbar.grid(row=2, column=0, sticky='ew')
-    app.open_button = ttk.Button(toolbar, text='Open file', image=app.icons['folder'], compound='left',
+    app.open_button = ttk.Button(header, text='Open file', image=app.icons['folder'], compound='left',
                                   style='Open.TButton', command=app.open_file)
     app.open_button.pack(side='left', padx=(0, px(14)))
-    file_box = tk.Frame(toolbar, background='#292e36', highlightthickness=1, highlightbackground=BORDER)
+    file_box = tk.Frame(header, background='#292e36', highlightthickness=1, highlightbackground=BORDER)
     file_box.pack(side='left', fill='both', expand=True)
     tk.Label(file_box, image=app.icons['file'], background='#292e36').pack(side='left', padx=(px(14), px(10)))
     tk.Label(file_box, textvariable=app.filename, background='#292e36', foreground='#e1e8f2',
-             font=('Segoe UI', 11), anchor='w').pack(side='left', fill='x', expand=True, pady=px(9))
+             font=('Segoe UI', 11), anchor='w', width=1).pack(side='left', fill='x', expand=True, pady=px(9))
 
     app.panes = ttk.Panedwindow(root, orient='horizontal')
-    app.panes.grid(row=3, column=0, sticky='nsew', padx=px(18))
+    app.panes.grid(row=2, column=0, sticky='nsew', padx=px(18))
 
     def card(width=0):
         frame = tk.Frame(app.panes, background=PANEL, highlightthickness=1, highlightbackground=BORDER, width=px(width))
@@ -272,22 +266,13 @@ def build_layout(app):
         entry = ttk.Entry(form, textvariable=variable, width=16)
         entry.grid(row=row, column=1, sticky='ew', pady=px(6))
         app.tolerance_entries.append(entry)
-    ttk.Label(form, text='Keep Z alignment tolerances are in drawing units.', style='Muted.TLabel',
+    ttk.Label(form, text='Keep Z tolerances are in drawing units.', style='Muted.TLabel',
               wraplength=px(260)).grid(row=6, column=0, columnspan=2, sticky='w', pady=(px(7), 0))
     ttk.Label(form, text='Units are declared; coordinates stay unchanged.', style='Muted.TLabel',
               wraplength=px(260)).grid(row=7, column=0, columnspan=2, sticky='w', pady=(px(7), 0))
-    ttk.Separator(settings).pack(fill='x', padx=px(16), pady=px(5))
-    summary = ttk.Frame(settings, style='Card.TFrame', padding=(px(16), px(10)))
-    summary.pack(fill='x')
-    ttk.Label(summary, text='Export summary', style='Heading.TLabel').pack(anchor='w', pady=(0, px(12)))
-    plan_badge = tk.Frame(summary, background='#393f49', highlightthickness=1, highlightbackground='#4a515e')
-    plan_badge.pack(fill='x')
-    tk.Label(plan_badge, textvariable=app.geometry_mode, background='#393f49', foreground='#dce5f2',
-             font=('Segoe UI', 11), anchor='w', padx=px(12), pady=px(9)).pack(fill='x')
-    ttk.Label(summary, text='Preserve circular arcs', image=app.icons['checked'], compound='left',
-              style='Card.TLabel', padding=(0, px(13), 0, px(5))).pack(anchor='w')
-    ttk.Label(summary, text='Preview shows the source plan. Keep Z requires known elevations.',
-              style='Muted.TLabel', wraplength=px(260)).pack(anchor='w')
+    app.linear_arc_checkbox = ttk.Checkbutton(form, text='Assume linear grade on arcs',
+                                              variable=app.linear_arc_elevations, command=app.settings_changed)
+    app.linear_arc_checkbox.grid(row=8, column=0, columnspan=2, sticky='w', pady=px(6))
     ttk.Separator(settings).pack(fill='x', padx=px(16), pady=px(5))
     destination = ttk.Frame(settings, style='Card.TFrame', padding=(px(16), px(10)))
     destination.pack(fill='x')
@@ -319,9 +304,9 @@ def build_layout(app):
     settings_host.pack(fill='both', expand=True)
 
     app.progress = ttk.Progressbar(root, mode='indeterminate')
-    app.progress.grid(row=4, column=0, sticky='ew', padx=px(18), pady=(px(8), px(5)))
+    app.progress.grid(row=3, column=0, sticky='ew', padx=px(18), pady=(px(8), px(5)))
     footer = tk.Frame(root, background=PANEL, highlightthickness=1, highlightbackground=BORDER)
-    footer.grid(row=5, column=0, sticky='ew', padx=px(18), pady=(px(10), 0))
+    footer.grid(row=4, column=0, sticky='ew', padx=px(18), pady=(px(10), 0))
     footer_content = ttk.Frame(footer, style='Card.TFrame', padding=(px(12), px(8)))
     footer_content.pack(fill='x')
     app.state_icon = ttk.Label(footer_content, image=app.icons['info'], style='Card.TLabel')
@@ -339,7 +324,7 @@ def build_layout(app):
     app.cancel_button = ttk.Button(footer_content, text='Cancel', style='Small.TButton', command=app.cancel, state='disabled')
     app.cancel_button.pack(side='right', padx=px(6))
     bottom = ttk.Frame(root, padding=(px(20), px(7), px(20), px(8)))
-    bottom.grid(row=6, column=0, sticky='ew')
+    bottom.grid(row=5, column=0, sticky='ew')
     ttk.Label(bottom, text='Local files  ·  Offline conversion', foreground=MUTED, font=('Segoe UI', 9)).pack(side='left')
     ttk.Label(bottom, text=f'v{__version__}', foreground=MUTED, font=('Segoe UI', 9)).pack(side='right')
     app.status_detail = ttk.Label(bottom, textvariable=app.status, foreground=MUTED, font=('Segoe UI', 9), anchor='e', width=1)

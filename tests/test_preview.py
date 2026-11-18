@@ -53,6 +53,34 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(points[-1], (99., 0.))
         self.assertEqual(len(collector.result()[0]['points']), 4)
 
+    def test_budget_keeps_sharp_bend_and_redistributes_small_model_share(self):
+        collector = PreviewCollector(5)
+        collector.add("Sparse", Primitive("point"), [(500, 500)])
+        path = [(x, 20 if x == 7 else 0) for x in range(100)]
+        collector.add("Dense", Primitive("polyline"), path)
+        dense = next(record["points"] for record in collector.result() if record["model"] == "Dense")
+        self.assertEqual(len(dense), 4)
+        self.assertIn((7, 20), dense)
+        self.assertEqual((dense[0], dense[-1]), (path[0], path[-1]))
+
+    def test_closed_outline_retains_three_distinct_vertices_and_closure(self):
+        collector = PreviewCollector(4)
+        collector.add("Model", Primitive("polyline", closed=True),
+                      [(0, 0), (1, 0), (2, 0), (2, 2), (0, 2), (0, 0)])
+        outline = collector.result()[0]["points"]
+        self.assertEqual(outline[0], outline[-1])
+        self.assertEqual(len(set(outline)), 3)
+
+    def test_spatial_coverage_keeps_isolated_feature_when_budget_is_full(self):
+        collector = PreviewCollector(4)
+        for x in range(40):
+            collector.add("Model", Primitive("point"), [(x, 0)])
+        collector.add("Model", Primitive("point"), [(1000, 1000)])
+        points = [point for record in collector.result() for point in record["points"]]
+        self.assertEqual(len(points), 4)
+        self.assertIn((1000, 1000), points)
+        self.assertTrue(any(x < 40 for x, _ in points))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#14171c" />
-    <title>12dAZ Converter — 12daz and 12da to 2D DXF</title>
+    <title>12dAZ Converter — 12daz and 12da to 2D and 3D DXF</title>
     <meta
       name="description"
-      content="Convert 12daz and 12da files to editable 2D DXF 2018. Download the free, offline Windows converter with model selection, plan preview and conversion reports."
+      content="Convert 12daz and 12da files to editable DXF 2018. Flatten to 2D or keep supported elevations with the free offline Windows converter."
     />
     <meta
       property="og:title"
@@ -15,7 +15,7 @@
     />
     <meta
       property="og:description"
-      content="A free, offline Windows application for converting supported 12daz and 12da geometry into 2D DXF 2018."
+      content="A free offline Windows converter for supported 12daz and 12da geometry with Flatten 2D and Keep Z export modes."
     />
     <meta property="og:type" content="website" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
@@ -82,13 +82,13 @@
         </h1>
         <p class="hero-description">
           Turn your <strong>.12daz</strong> and <strong>.12da</strong> files
-          into 2D DXF 2018. Preview your models, choose what to export, and keep
-          your work on your own computer.
+          into editable DXF 2018. Preview your models and choose Flatten 2D
+          or Keep Z to preserve known elevations on supported geometry.
         </p>
         <div class="hero-actions">
           <a
             class="button button-primary"
-            href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.3/12dAZ-Converter-0.1.3-Windows-x64.zip"
+            href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.4/12dAZ-Converter-0.1.4-Windows-x64.zip"
             ><span aria-hidden="true">↓</span> Download for Windows</a
           >
           <a class="button button-secondary" href="#how-it-works"
@@ -96,7 +96,7 @@
           >
         </div>
         <p class="release-meta">
-          v0.1.3 preview <span aria-hidden="true">/</span> Windows x64
+          v0.1.4 preview <span aria-hidden="true">/</span> Windows x64
           <span aria-hidden="true">/</span> Free &amp; open source
         </p>
           </div>
@@ -156,15 +156,16 @@
             <h3>Choose your models</h3>
             <p>
               Open a .12daz archive or .12da file, review the plan preview and
-              select the models you want to export.
+              select the models you want to export. For dense models, the
+              preview prioritizes bends, outlines and coverage across the drawing.
             </p>
           </article>
           <article class="feature">
             <span class="feature-index">[02]</span>
             <h3>Keep your coordinates</h3>
             <p>
-              Preserve source XY coordinates and supported circular arcs.
-              Geometry is flattened to Z = 0 for a 2D drawing.
+              Flatten geometry to Z = 0 for a plan drawing, or use Keep Z for
+              supported strings and alignments. Level circular arcs can remain exact.
             </p>
           </article>
           <article class="feature">
@@ -218,8 +219,8 @@
               <span class="step-number" aria-hidden="true">03</span>
               <h3>Review &amp; select</h3>
               <p>
-                Explore the plan preview, select your models and choose drawing
-                units and a DXF destination.
+                Explore the plan preview and select your models. Choose drawing
+                units, an export mode and a DXF destination.
               </p>
             </li>
             <li>
@@ -248,7 +249,7 @@
           <p class="eyebrow">03 / KNOW YOUR OUTPUT</p>
           <h2 id="geometry-title">Clear about<br />what carries across.</h2>
           <p>
-            Built for supported plan geometry. Always check the conversion
+            Built for supported survey geometry. Always check the conversion
             report before using your drawing.
           </p>
         </div>
@@ -261,11 +262,14 @@
             <p>
               Straight and circular segments in supported super strings and
               legacy strings; XY arcs and circles; point strings; basic
-              single-line world-size text; and solved horizontal super-alignment
-              geometry with supported segments.
+              single-line world-size text; and supported super alignments.
+              Flatten 2D also exports verified drainage pipe spans.
             </p>
             <p>
-              Source XY is preserved. Output is DXF 2018, flattened to Z = 0.
+              Keep Z preserves known elevations and can sample solved alignment
+              grades and symmetric parabolas. For circular strings with changing
+              elevations, enable <strong>Assume linear grade on arcs</strong>.
+              The report records the assumption and the selected plan tolerance.
             </p>
           </div>
           <div class="geometry-group">
@@ -274,10 +278,10 @@
               limits
             </h3>
             <p>
-              TINs, meshes, drainage, transition curves, symbols, rendered
-              annotations and paper/screen-size text are not implemented. Civil
-              semantics and alignment labels are omitted. Custom colours, styles
-              and fonts may be substituted.
+              Drainage pipe elevations and original transition spiral reconstruction
+              are pending. 4D strings and contours are deferred. TINs, meshes,
+              symbols, rendered annotations and paper/screen-size text are
+              unsupported. Civil attributes and alignment labels are omitted.
             </p>
             <p>
               Objects containing unsupported curves are skipped whole. DWG
@@ -315,14 +319,14 @@
               MIT-licensed source.
             </p>
             <div class="download-tags">
-              <span>Windows x64</span><span>v0.1.3 preview</span
-              ><span>ZIP · 28.3 MB</span>
+              <span>Windows x64</span><span>v0.1.4 preview</span
+              ><span>ZIP</span>
             </div>
           </div>
           <div class="download-actions">
             <a
               class="button button-primary"
-              href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.3/12dAZ-Converter-0.1.3-Windows-x64.zip"
+              href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.4/12dAZ-Converter-0.1.4-Windows-x64.zip"
               ><span aria-hidden="true">↓</span> Download for Windows</a
             >
             <p>
@@ -332,11 +336,11 @@
             </p>
             <div class="release-links">
               <a
-                href="https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.3"
+                href="https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.4"
                 >Release notes</a
               ><span aria-hidden="true">·</span
               ><a
-                href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.3/SHA256SUMS.txt"
+                href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.4/SHA256SUMS.txt"
                 >SHA-256 checksum</a
               >
             </div>
@@ -347,7 +351,7 @@
           <p>
             We are exploring multiple options for trusted code signing.
             Signing is not yet active. The current
-            <strong>v0.1.3 Windows executable is unsigned</strong>, so Windows
+            <strong>v0.1.4 Windows executable is unsigned</strong>, so Windows
             may show an <strong>Unknown publisher</strong>
             notice or this Microsoft Defender SmartScreen warning:
           </p>
@@ -401,8 +405,9 @@
           <details>
             <summary>Does the DXF preserve elevations?</summary>
             <p>
-              No. The output is a 2D plan drawing. Source XY coordinates are
-              preserved and Z is flattened to zero.
+              Yes, for supported geometry in Keep Z mode. Valid zero and
+              negative elevations are preserved. Flatten 2D sets the output
+              elevations to zero. Check the report for objects skipped in Keep Z.
             </p>
           </details>
           <details>

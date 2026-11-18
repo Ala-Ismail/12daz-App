@@ -28,10 +28,8 @@ class StartupSplash:
         tk.Label(inner, image=self.logo, background=BG).pack(anchor='w', pady=(0, 12))
         tk.Label(inner, text='12dAZ Converter', background=BG, foreground=INK,
                  font=('Segoe UI', 22, 'bold')).pack(anchor='w')
-        tk.Label(inner, text='12daz / 12da to 2D DXF', background=BG, foreground=MUTED,
-                 font=('Segoe UI', 11)).pack(anchor='w', pady=(5, 18))
         divider = tk.Frame(inner, background=BORDER, height=1)
-        divider.pack(fill='x', pady=(0, 16))
+        divider.pack(fill='x', pady=(18, 16))
         tk.Label(inner, text=support.COFFEE_MESSAGE, background=BG, foreground=INK,
                  font=('Segoe UI', 11), wraplength=430, justify='left').pack(anchor='w')
         tk.Label(inner, text='Free and open source. Support is optional.', background=BG, foreground=MUTED,

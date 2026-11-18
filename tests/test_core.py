@@ -193,6 +193,30 @@ class CoreTests(unittest.TestCase):
                          [(0, 10, -2), (0, 10, 3), (10, 10, 5)])
         self.assertEqual(tuple(circle.dxf.center), (2, 4, 12))
 
+    def test_EG08_rising_arc_uses_explicit_grade_and_retains_level_arc(self):
+        self.fixture(
+            'string super { breakline line data_3d {0 0 0 10 10 4 20 20 4} '
+            'radius_data {-10 -10} }'
+        )
+        default = inspect_file(self.source, Options(geometry_mode="keep-z"))
+        self.assertEqual(default["source_counts"]["skipped"], 1)
+        report = self.convert(geometry_mode="keep-z", linear_arc_elevations=True, plan_tolerance=0.005)
+        sampled, level = self.entities()
+        self.assertTrue(sampled.is_3d_polyline)
+        vertices = [tuple(vertex.dxf.location) for vertex in sampled.vertices]
+        self.assertEqual((vertices[0], vertices[-1]), ((0, 0, 0), (10, 10, 4)))
+        for x, y, z in vertices:
+            angle = math.atan2(x, 10 - y)
+            self.assertAlmostEqual(math.hypot(x, y - 10), 10)
+            self.assertAlmostEqual(z, 4 * angle / (math.pi / 2))
+        for a, b in zip(vertices, vertices[1:]):
+            x, y = ((a[i] + b[i]) / 2 for i in range(2))
+            self.assertLessEqual(10 - math.hypot(x, y - 10), 0.005)
+        self.assertEqual(level.dxftype(), "LWPOLYLINE")
+        self.assertEqual(level.dxf.elevation, 4)
+        self.assertAlmostEqual(list(level.get_points("b"))[0][0], math.sqrt(2) - 1)
+        self.assertEqual(report["diagnostics"]["counts"]["ELEVATED_ARC_SAMPLED"], 1)
+
     def test_EG05_ip_only_alignment_reconstructs_closed_plan(self):
         self.convert(
             'string super_alignment { horizontal_ips_only true valid_horizontal true closed 1 '

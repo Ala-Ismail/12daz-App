@@ -54,6 +54,7 @@ class ConverterApp:
         self.geometry_mode = tk.StringVar(value="Flatten 2D")
         self.plan_tolerance = tk.StringVar(value="0.01")
         self.elevation_tolerance = tk.StringVar(value="0.01")
+        self.linear_arc_elevations = tk.BooleanVar(value=False)
         self.units = tk.StringVar(value="Choose units…")
         self.encoding = tk.StringVar(value="Automatic (BOM / UTF-8)")
         self.status = tk.StringVar(value="Ready · all processing stays on this computer")
@@ -183,6 +184,8 @@ class ConverterApp:
             widget.configure(state='disabled' if self.busy else 'readonly')
         for widget in self.tolerance_entries:
             widget.configure(state='normal' if not self.busy and self.geometry_mode.get() == 'Keep Z' else 'disabled')
+        self.linear_arc_checkbox.configure(
+            state='normal' if not self.busy and self.geometry_mode.get() == 'Keep Z' else 'disabled')
         self.file_menu.entryconfigure(0, state='disabled' if self.busy else 'normal')
         self.report_button.configure(state='normal' if self.result or self.scan else 'disabled')
         self.update_status_display()
@@ -351,7 +354,7 @@ class ConverterApp:
                 if not all(math.isfinite(value) and value > 0 for value in tolerances.values()):
                     raise ValueError
             except ValueError:
-                messagebox.showerror("Invalid alignment tolerance",
+                messagebox.showerror("Invalid curve tolerance",
                                      "Enter positive finite plan and elevation tolerances in drawing units.",
                                      parent=self.root)
                 return
@@ -362,7 +365,8 @@ class ConverterApp:
             if not overwrite:
                 return
         options = Options(units=self.units.get(), models=sorted(self.selected), overwrite=overwrite,
-                          encoding=self.chosen_encoding(), geometry_mode=mode, **tolerances)
+                          encoding=self.chosen_encoding(), geometry_mode=mode,
+                          linear_arc_elevations=mode == "keep-z" and self.linear_arc_elevations.get(), **tolerances)
         self.start_job("convert", options)
 
     def start_job(self, action, options):
@@ -577,7 +581,7 @@ class ConverterApp:
         support_text = f'\n\n{support.COFFEE_MESSAGE}\nSupport is optional.'
         if link:
             support_text += f'\n{link}'
-        return self.text_dialog("About 12dAZ Converter", f"12dAZ Converter\nVersion {__version__} · build {__version__}\n\n12daz / 12da to 2D DXF\nOffline desktop converter\n\n{COPYRIGHT}\n\nLicensed under the MIT License.\n\nSee Help → License and Third-party Notices for the full license and bundled dependency notices." + support_text, show_support=True)
+        return self.text_dialog("About 12dAZ Converter", f"12dAZ Converter\nVersion {__version__} · build {__version__}\n\nOffline desktop converter\n\n{COPYRIGHT}\n\nLicensed under the MIT License.\n\nSee Help → License and Third-party Notices for the full license and bundled dependency notices." + support_text, show_support=True)
 
     def show_licenses(self):
         return self.text_dialog("License and Third-party Notices", resource_text("LICENSE.txt") + "\n\n" + resource_text("THIRD_PARTY_NOTICES.txt"))

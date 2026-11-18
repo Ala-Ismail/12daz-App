@@ -404,11 +404,13 @@ jobs:
           asset="package/$PACKAGE_NAME.zip"
           sums="package/SHA256SUMS.txt"
           cat > release-notes.md <<'NOTES'
-          Free, MIT-licensed Windows converter from 12daz / 12da to editable 2D DXF.
+          Free, MIT-licensed Windows converter from 12daz / 12da to editable DXF 2018.
 
           Extract the complete Windows ZIP and run 12dAZ-Converter.exe. Keep the _internal folder beside it. Python, AutoCAD and 12d Model are not required on the user's computer.
 
-          Includes model selection, a dark grey GUI, an interactive plan preview, exact supported circular arcs, zero-Z DXF export and conversion reports. The 30,000-point preview allowance is shared across selected models; DXF export uses full supported geometry.
+          - **Flatten 2D** exports supported plan geometry, including verified drainage pipe spans. **Keep Z** preserves known elevations and supports solved alignment grades and symmetric parabolic profiles.
+          - **Assume linear grade on arcs** lets Keep Z sample circular strings with varying elevations to the selected plan tolerance. The conversion report records the grade assumption.
+          - Dense previews prioritize bends, closed outlines and spatial coverage within the shared 30,000-point budget. The title row includes the open button and filename.
 
           This is a preview build. Unsupported objects, omitted metadata/labels and style substitutions are reported. Independent CAD and clean-machine release qualification remain pending. Review conversion reports before using exported drawings.
 

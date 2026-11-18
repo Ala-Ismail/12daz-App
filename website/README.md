@@ -36,13 +36,13 @@ The v0.1.3 ZIP and checksum URLs both returned HTTP 200 on 15 November 2026. Hos
 
 ## Updating a download
 
-`index.html` currently links to the publicly available v0.1.3 pre-release. The ZIP is 28,321,416 bytes (28.3 MB). Releases and binaries stay on GitHub.
+`index.html` links to the v0.1.4 pre-release, Windows x64 ZIP and checksum on GitHub.
 
 When publishing a new desktop version:
 
 1. Verify the release and both its Windows ZIP and checksum are public.
 2. Update both download buttons, the release-notes link and checksum link together.
-3. Update the version labels, preview/release status and ZIP size.
+3. Update the version labels and preview/release status.
 4. Check product claims against `readme.md` and `docs/validation_status.md`.
 5. If changing the screenshot, copy an actual application screenshot into `assets/`, update image dimensions and alternative text, and label its version and demonstration data accurately.
 
@@ -52,7 +52,7 @@ See [website_design.md](website_design.md) for the design brief.
 
 ## Code signing policy
 
-`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The website states that v0.1.3 is unsigned and multiple signing options are being explored; keep the wording provider-neutral until a provider is selected and signing is activated. The download section also displays the signing status, possible Unknown publisher / SmartScreen warning and checksum guidance. Update both pages and the download notice when a signed release becomes available.
+`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The website states that v0.1.4 is unsigned and multiple signing options are being explored; keep the wording provider-neutral until a provider is selected and signing is activated. The download section also displays the signing status, possible Unknown publisher / SmartScreen warning and checksum guidance. Update both pages and the download notice when a signed release becomes available.
 
 ## Hero image
 

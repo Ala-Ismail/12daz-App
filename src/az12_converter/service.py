@@ -26,6 +26,7 @@ class Options:
     geometry_mode: str = "flatten-2d"
     plan_tolerance: float = 0.01
     elevation_tolerance: float = 0.01
+    linear_arc_elevations: bool = False
 
 
 class Diagnostics:
@@ -114,7 +115,7 @@ def _job(path, options, *, output=None, report_path=None, limits=Limits(), cance
     digest = input_hash(source_path, cancel)
     diagnostics = Diagnostics()
     summaries = {}
-    preview = PreviewCollector(preview_limit)
+    preview = PreviewCollector(preview_limit, cancel)
     selected = exact = approximated = skipped = 0
     selected_models = {m.casefold() for m in options.models} if options.models is not None else None
     bounds = None
@@ -140,7 +141,8 @@ def _job(path, options, *, output=None, report_path=None, limits=Limits(), cance
 
             try:
                 geometry = convert_geometry(entity, warn, keep_z, cancel, plan_tolerance=options.plan_tolerance,
-                                            elevation_tolerance=options.elevation_tolerance)
+                                            elevation_tolerance=options.elevation_tolerance,
+                                            linear_arc_elevations=options.linear_arc_elevations)
             except UnsupportedGeometry as exc:
                 skipped += 1
                 warn("UNSUPPORTED_OR_INVALID_GEOMETRY", str(exc))
@@ -181,7 +183,7 @@ def _job(path, options, *, output=None, report_path=None, limits=Limits(), cance
               "bounds": bounds, "bounds_note": "Preview bounds; curved extents sampled for display.",
               "preview": preview.result(), "preview_simplified": preview.limited,
               "preview_omitted_models": preview.omitted_models(),
-              "preview_note": "Display allowance shared across models; paths/points may be sampled for preview only. DXF retains exact supported geometry.",
+              "preview_note": "Preview prioritizes path shape and spatial coverage within the shared display allowance. DXF export uses independent geometry.",
               "units": options.units, "emitted_entities": writer.count if writer else None,
               "layer_mapping": writer.layers if writer else {}, "diagnostics": diagnostics.result(), "published": False}
     if output:

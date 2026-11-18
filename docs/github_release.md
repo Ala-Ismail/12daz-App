@@ -23,7 +23,7 @@ The existing `v0.1.2` tag predates this workflow update. Keep the tag unchanged:
 
 Leaving `release_tag` blank performs a build only. The supplied tag must already exist and must match both the application and `pyproject.toml` versions. For example, tag `v0.1.2` requires version `0.1.2`.
 
-To publish after verification, check **publish_release** when running the workflow. Alternatively, use **Actions > Publish release > Run workflow**, enter the existing tag and run it. That release-specific workflow builds the exact tagged source and publishes the verified ZIP and checksum as a pre-release. A push changing that release-specific workflow creates its configured new annotated version tag at the triggering commit, then builds and publishes it. Existing tags are never moved. The current configured version is v0.1.3; manual runs require an existing tag.
+To publish after verification, check **publish_release** when running the workflow. Alternatively, use **Actions > Publish release > Run workflow**, enter the existing tag and run it. That release-specific workflow builds the exact tagged source and publishes the verified ZIP and checksum as a pre-release. A push changing that release-specific workflow creates its configured new annotated version tag at the triggering commit, then builds and publishes it. Existing tags are never moved. The current configured version is v0.1.4; manual runs require an existing tag.
 
 A rerun can refresh attachments on an existing draft. An already published release is preserved; the new package remains available as an Actions artifact. Use a new version/tag for a revised published package.
 
@@ -34,8 +34,8 @@ A rerun can refresh attachments on an existing draft. An already published relea
 3. Create and push a new annotated tag matching the version, for example:
 
 ```powershell
-git tag -a v0.1.3 -m "12dAZ Converter v0.1.3"
-git push origin v0.1.3
+git tag -a v0.1.4 -m "12dAZ Converter v0.1.4"
+git push origin v0.1.4
 ```
 
 Pushing the tag runs the workflow and prepares the draft automatically. The filenames are derived from the application version; the workflow does not require a filename edit for each release.
