@@ -46,7 +46,7 @@ When publishing a new desktop version:
 4. Check product claims against `readme.md` and `docs/validation_status.md`.
 5. If changing the screenshot, copy an actual application screenshot into `assets/`, update image dimensions and alternative text, and label its version and demonstration data accurately.
 
-The support link is <https://paypal.me/12dazapp>, labelled **Buy me coffee** beneath the download panel and in the footer. A closing section above the footer pairs an actual application screenshot with **Would you buy me a cuppa?** and a **Buy me a cuppa** button. Its image, `assets/12daz-coffee-and-muffin-gui.png`, captures the v0.1.3 GUI after opening `outputs/coffee_and_muffin.12da` through the application's normal loading workflow, with all five models selected and units set to millimetres. The original synthetic drawing and generated DXF remain in ignored `outputs/`.
+The support link is <https://paypal.me/12dazapp>, labelled **Buy me coffee** beneath the download panel and in the footer. A closing section above the footer pairs an actual application screenshot with **Would you buy me a cuppa?** and a **Buy me a cuppa** button. Its image, `assets/12daz-coffee-and-muffin-gui.png`, captures the v0.1.5 GUI after opening `outputs/coffee_and_muffin.12da` through the application's normal loading workflow, with all five models selected and units set to millimetres. The original synthetic drawing and generated DXF remain in ignored `outputs/`.
 
 See [website_design.md](website_design.md) for the design brief.
 

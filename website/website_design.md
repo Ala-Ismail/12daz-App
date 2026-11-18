@@ -47,7 +47,7 @@ Show Windows x64 and offline operation beside the action. Show a version only wh
 
 ### 3. Application preview
 
-Use `docs/assets/12daz-converter-gui-v0.1.2.png`, copied into `website/assets/` during implementation so the deployed folder contains its own assets. Caption it as an application screenshot using synthetic demonstration data, and identify its version if it differs from the download.
+Use the actual application capture at `website/assets/12daz-converter-gui.png`. Caption it as an application screenshot using synthetic demonstration data, and identify its version if it differs from the download.
 
 Do not use the GUI proposal image as evidence of implemented behaviour. Preserve the screenshot's aspect ratio and provide useful alternative text.
 
@@ -105,7 +105,7 @@ If no public package is available, use **View releases** and state that a downlo
 
 ### 9. Closing support section
 
-At the bottom of the page, after the FAQ and before the footer, show an actual screenshot of the v0.1.3 application GUI with `outputs/coffee_and_muffin.12da` open beside the 12dAZ Converter name and the heading **Would you buy me a cuppa?**. Capture the real loaded application, including model selection, drawing preview and export controls; use `website/assets/12daz-coffee-and-muffin-gui.png` and label its version and synthetic demonstration data. Link the **Buy me a cuppa** button to <https://paypal.me/12dazapp> and make clear that support is optional. Stack the image and text on mobile. Keep the main application screenshot in the hero section.
+At the bottom of the page, after the FAQ and before the footer, show an actual screenshot of the application GUI with `outputs/coffee_and_muffin.12da` open beside the 12dAZ Converter name and the heading **Would you buy me a cuppa?**. Capture the real loaded application, including model selection, drawing preview and export controls; use `website/assets/12daz-coffee-and-muffin-gui.png` and label its version and synthetic demonstration data. Link the **Buy me a cuppa** button to <https://paypal.me/12dazapp> and make clear that support is optional. Stack the image and text on mobile. Keep the main application screenshot in the hero section.
 
 ### 10. Footer
 
@@ -131,7 +131,7 @@ website/
   assets/
     favicon.svg
     12daz-coffee-and-muffin-gui.png
-    12daz-converter-gui-v0.1.2.png
+    12daz-converter-gui.png
 ```
 
 The page and assets are self-contained in this directory. Add a `vercel.json` only if deployment needs configuration beyond the static project settings.

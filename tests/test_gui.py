@@ -1,4 +1,4 @@
-"""Tk widget/state and spawned-worker integration tests; windows stay withdrawn."""
+"""Tk widget, keyboard navigation, and spawned-worker integration tests."""
 import json
 from pathlib import Path
 import tempfile
@@ -50,7 +50,11 @@ class GuiTests(unittest.TestCase):
 
     def test_UI01_units_required_and_selection_controls(self):
         self.assertTrue(self.app.export_button.instate(['disabled']))
-        self.load()
+        self.app.load_path(str(self.source))
+        self.assertTrue(self.app.open_menu_item.instate(['disabled']))
+        self.wait_job()
+        self.assertIsNotNone(self.app.scan, self.app.status.get())
+        self.assertTrue(self.app.open_menu_item.instate(['!disabled']))
         self.assertTrue(self.app.export_button.instate(['disabled']))
         self.app.units.set('metres')
         self.assertTrue(self.app.export_button.instate(['!disabled']))
@@ -179,6 +183,32 @@ class GuiTests(unittest.TestCase):
         self.assertIn('Third-party', resource_text('THIRD_PARTY_NOTICES.txt'))
         self.app.show_guide().destroy()
         self.app.show_licenses().destroy()
+
+    def test_UI08_help_menu_keyboard_navigation(self):
+        self.root.deiconify()
+        self.root.update()
+        self.app.open_button.focus_force()
+        self.root.event_generate('<Alt-h>')
+        self.root.update()
+        self.assertIsNotNone(self.root.grab_current())
+        self.assertIn('User Guide', self.root.focus_get().cget('text'))
+
+        self.root.focus_get().event_generate('<Down>')
+        self.root.update()
+        self.assertEqual(self.root.focus_get().cget('text'), 'About 12dAZ Converter')
+
+        self.root.focus_get().event_generate('<Escape>')
+        self.root.update()
+        self.assertIsNone(self.root.grab_current())
+        self.assertEqual(self.root.focus_get(), self.app.open_button)
+
+        self.root.event_generate('<Alt-h>')
+        self.root.update()
+        self.root.focus_get().event_generate('<Return>')
+        self.root.update()
+        self.assertIsNone(self.root.grab_current())
+        dialogs = [child for child in self.root.winfo_children() if isinstance(child, tk.Toplevel)]
+        self.assertEqual([dialog.title() for dialog in dialogs], ['User Guide'])
 
     def test_UI07_about_support_link(self):
         from az12_converter import support

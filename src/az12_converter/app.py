@@ -28,7 +28,7 @@ class ConverterApp:
     def __init__(self, root):
         self.root = root
         root.title("12dAZ Converter")
-        root.geometry("1440x900")
+        root.geometry("1280x760")
         root.minsize(1040, 680)
         self.context = mp.get_context("spawn")
         self.process = self.messages = self.cancel_event = None
@@ -62,7 +62,6 @@ class ConverterApp:
         self.cursor = tk.StringVar(value="Plan preview")
         self._styles()
         root.iconphoto(True, self.icons['logo'])
-        self._menu()
         self._layout()
         self.search.trace_add("write", lambda *_: self.populate_models())
         self.units.trace_add("write", lambda *_: self.settings_changed())
@@ -72,29 +71,11 @@ class ConverterApp:
         self.status.trace_add("write", lambda *_: self.update_status_display())
         self.update_controls()
         root.protocol("WM_DELETE_WINDOW", self.close)
-        root.bind("<Control-o>", lambda e: self.open_file())
-        root.bind("<F1>", lambda e: self.show_guide())
         root.after(100, self.poll)
 
     def _styles(self):
         from .ui_layout import configure_styles
         configure_styles(self)
-
-    def _menu(self):
-        from .ui_layout import PANEL, INK
-        menu_style = {'tearoff': False, 'background': PANEL, 'foreground': INK,
-                      'activebackground': '#3c506d', 'activeforeground': '#ffffff',
-                      'borderwidth': 1, 'activeborderwidth': 0}
-        self.file_menu = tk.Menu(self.root, **menu_style)
-        self.file_menu.add_command(label="Open file…", accelerator="Ctrl+O", command=self.open_file)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="Exit", command=self.close)
-        help_menu = tk.Menu(self.root, **menu_style)
-        help_menu.add_command(label="User Guide", accelerator="F1", command=self.show_guide)
-        help_menu.add_command(label="About 12dAZ Converter", command=self.show_about)
-        help_menu.add_separator()
-        help_menu.add_command(label="License and Third-party Notices", command=self.show_licenses)
-        self.help_menu = help_menu
 
     def _layout(self):
         from .ui_layout import build_layout
@@ -104,7 +85,7 @@ class ConverterApp:
         if self.search.get() or self.root.focus_get() == self.search_entry:
             self.search_placeholder.place_forget()
         else:
-            self.search_placeholder.place(x=round(37 * max(1, self.root.winfo_fpixels('1i') / 96)), rely=.5, anchor='w')
+            self.search_placeholder.place(x=self.search_hint_x, rely=.5, anchor='w')
 
     def toggle_input_options(self):
         if self.input_options.winfo_manager():
@@ -146,13 +127,13 @@ class ConverterApp:
         else:
             self.warning_button.pack_forget()
         if self.busy:
-            self.cancel_button.pack(side='right', padx=6)
+            self.cancel_button.pack(side='right', padx=(4, 0))
             self.progress.grid()
         else:
             self.cancel_button.pack_forget()
             self.progress.grid_remove()
         if self.result and self.result.get('published'):
-            self.folder_button.pack(side='right', padx=10)
+            self.folder_button.pack(side='right', padx=4)
         else:
             self.folder_button.pack_forget()
 
@@ -186,7 +167,7 @@ class ConverterApp:
             widget.configure(state='normal' if not self.busy and self.geometry_mode.get() == 'Keep Z' else 'disabled')
         self.linear_arc_checkbox.configure(
             state='normal' if not self.busy and self.geometry_mode.get() == 'Keep Z' else 'disabled')
-        self.file_menu.entryconfigure(0, state='disabled' if self.busy else 'normal')
+        self.open_menu_item.configure(state='disabled' if self.busy else 'normal')
         self.report_button.configure(state='normal' if self.result or self.scan else 'disabled')
         self.update_status_display()
 
@@ -538,20 +519,20 @@ class ConverterApp:
                 c.create_text(x, bottom - 18, text=text, fill='#e7edf6', font=('Segoe UI', 9))
 
     def text_dialog(self, title, text, *, show_support=False):
-        from .ui_layout import FIELD, BORDER, INK, dark_titlebar
-        dialog = tk.Toplevel(self.root)
+        from .ui_layout import BG, FIELD, INK, dark_titlebar
+        dialog = tk.Toplevel(self.root, background=BG)
         dialog.title(title)
         dialog.geometry("780x580")
         dialog.minsize(520, 350)
         dialog.transient(self.root)
         dialog.bind('<Map>', lambda e: dark_titlebar(dialog) if e.widget == dialog else None, add='+')
-        heading = ttk.Frame(dialog, padding=(20, 16, 20, 10))
+        heading = ttk.Frame(dialog, padding=(14, 12, 14, 8))
         heading.pack(fill='x')
         ttk.Label(heading, text=title, font=('Segoe UI', 14, 'bold')).pack(anchor='w')
-        frame = ttk.Frame(dialog, padding=16)
-        frame.pack(fill="both", expand=True)
-        area = tk.Text(frame, wrap="word", padx=16, pady=14, font=("Segoe UI", 10),
-                       relief='flat', highlightthickness=1, highlightbackground=BORDER,
+        frame = ttk.Frame(dialog, style='Panel.TFrame', padding=5)
+        frame.pack(fill="both", expand=True, padx=12)
+        area = tk.Text(frame, wrap="word", padx=10, pady=9, font=("Segoe UI", 10),
+                       relief='flat', highlightthickness=0,
                        background=FIELD, foreground=INK, selectbackground='#294f7c')
         scroll = ttk.Scrollbar(frame, command=area.yview)
         area.configure(yscrollcommand=scroll.set)
@@ -559,7 +540,7 @@ class ConverterApp:
         area.pack(fill="both", expand=True)
         area.insert("1.0", text)
         area.configure(state="disabled")
-        footer = ttk.Frame(dialog, padding=(16, 0, 16, 12))
+        footer = ttk.Frame(dialog, padding=(12, 8, 12, 10))
         footer.pack(fill='x')
         if show_support:
             from . import support
