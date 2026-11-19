@@ -2,21 +2,21 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-Version **0.1.4** is an initial working implementation. Independent CAD comparison and clean-machine release qualification remain pending. Read the conversion report: unsupported geometry, omitted labels/metadata and style substitutions are explicitly reported. DWG remains future work.
+The latest release is [**v0.1.5**](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.5), a Windows pre-release. Independent CAD comparison and clean-machine release qualification remain pending. Review the conversion report for unsupported geometry, omitted labels and metadata, and style substitutions. DWG remains future work.
 
-![12dAZ Converter dark grey desktop interface](docs/assets/12daz-converter-gui-v0.1.2.png)
+![12dAZ Converter v0.1.5 desktop interface](website/assets/12daz-converter-gui.png)
 
 *Screenshot uses synthetic demonstration data.*
 
 ## Code signing status and Windows warning
 
-We are working toward trusted code signing for 12dAZ Converter and exploring the SignPath Foundation open-source programme. Signing is not yet approved or active, and the current **v0.1.4 Windows executable is unsigned**. In the meantime, Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning such as: **“Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.”**
+We are working toward trusted code signing for 12dAZ Converter and exploring the SignPath Foundation open-source programme. Signing is not yet approved or active, and the current **v0.1.5 Windows executable is unsigned**. In the meantime, Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning such as: **“Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.”**
 
 Download only from the project's [official GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases) and verify the ZIP against its published `SHA256SUMS.txt`. A matching checksum verifies download integrity; it does not replace a publisher signature or establish that a program is safe. See the [Code signing policy](docs/code_signing_policy.md) for current status and release responsibilities.
 
 ## Run the Windows application
 
-The local build is `dist/12dAZ-Converter-0.1.4/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.4-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
+The local build is `dist/12dAZ-Converter-0.1.5/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.5-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
 
 1. Open a `.12daz` or `.12da` file.
 2. Review models and preview; select the models to export.
@@ -74,7 +74,7 @@ The test suite uses Python's standard `unittest`, synthetic fixtures and withdra
 To smoke-test a built executable without showing its main window:
 
 ```powershell
-& .\dist\12dAZ-Converter-0.1.4\12dAZ-Converter.exe --smoke-test "$PWD\outputs\packaged-smoke.json"
+& .\dist\12dAZ-Converter-0.1.5\12dAZ-Converter.exe --smoke-test "$PWD\outputs\packaged-smoke.json"
 ```
 
 Create the report's parent directory first. This check runs Tk startup, spawned scanning/export, DXF audit and offline Help/About resources on synthetic data. It does not replace clean-machine qualification.
@@ -90,7 +90,7 @@ See [GitHub build and release steps](docs/github_release.md) for details.
 ## Project documents
 
 - [Design and original GUI concept](12daz_design.md).
-- [Current GUI screenshot](docs/assets/12daz-converter-gui-v0.1.2.png) using synthetic demonstration data.
+- [Current GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
 - [Implementation steps](docs/implementation_steps.md).
 - [Test requirements and cases](docs/test_requirements.md).
 - [Validation status and remaining release checks](docs/validation_status.md).
