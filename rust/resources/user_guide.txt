@@ -1,27 +1,61 @@
 12dAZ Converter — User Guide
 
-1. Open an archive
-Choose File > Open archive, Ctrl+O, or Open archive in the title row. Select a ZIP .12daz containing one .12da payload, or a plain .12da file. Input stays on this computer. Automatic decoding honours Unicode BOMs and otherwise uses strict UTF-8. For older files, open Input options and choose a fallback encoding.
+Contents
+- 1.1 Open an archive
+- 1.2 Select models
+- 1.3 Inspect the plan preview
+- 1.4 Choose geometry and units
+- 1.5 Export DXF
+- 1.6 Review the results
+- 1.7 Supported geometry
+- 1.8 Set up a background map
+- 1.9 Get a Google Maps API key
+- 1.10 Get an Esri API key
+- 1.11 About and support
 
-2. Select models
+1.1 Open an archive
+Choose File > Open archive, Ctrl+O, or Open archive in the title row. Select a ZIP .12daz containing one .12da payload, or a plain .12da file. The archive and conversion stay on this computer. Automatic decoding honours Unicode BOMs and otherwise uses strict UTF-8. For older files, open Input options and choose a fallback encoding.
+
+1.2 Select models
 The converter initially selects models with convertible geometry. Click a checkbox or focus it and press Space. Search filters the displayed rows and preserves hidden selections. Select all checks every convertible model. Use Report to see the full inventory and diagnostics.
 
-3. Inspect the plan preview
+1.3 Inspect the plan preview
 Drag to pan, scroll to zoom, or choose a zoom percentage. Fit resets the extent to the selected models. The preview shares at most 30,000 display points across the selection. Selecting models refreshes the preview in the background. DXF export uses independent, full geometry.
 
-4. Choose geometry and units
+1.4 Choose geometry and units
 Flatten 2D exports supported plan geometry at zero elevation. Keep Z retains verified elevations. Set positive plan and elevation tolerances for supported curve sampling. For arcs with differing endpoint elevations, enable Assume linear grade on arcs only if that assumption suits the source data. Select metres, millimetres, feet, or inches. Unit declaration leaves coordinates unchanged.
 
-5. Export DXF
+1.5 Export DXF
 Choose a DXF destination and select Export DXF. Confirm before replacing existing output. Cancel stops the job at a safe checkpoint. The converter validates the temporary drawing before publishing it. Publication can complete before a late cancellation arrives.
 
-6. Review the results
+1.6 Review the results
 Report shows selected and skipped objects, emitted entities, warnings, and layer mappings. The application writes a .dxf.conversion.json report beside the drawing. Open output folder locates it. Unsupported geometry, omitted attributes, and appearance substitutions are reported. A report write failure leaves a successfully published DXF available.
 
-Supported geometry
+1.7 Supported geometry
 Points, supported straight and circular strings, closed outlines, circles and arcs, single-line world-size text, supported solved and reconstructed alignments, and verified drainage plan spans in Flatten 2D. Keep Z can sample supported profiles and selected elevated arcs. The converter omits unsupported civil semantics, symbols, meshes and source labels. Drainage Keep Z requires verified source elevations and is unavailable. The output is DXF 2018.
 
-About and support
+1.8 Set up a background map
+Open a survey archive and choose View > Background Map. If the survey already uses MGA, select its datum and zone, confirm the source coordinate units and select Apply. For a local grid, select Local grid and enter or pick a drawing point with its known map coordinates. Add a second pair to include scale and rotation. Save alignment writes the map registration beside the source. The background is for visual context. Map settings leave survey coordinates and DXF exports unchanged.
+
+The map starts Off. Choose OpenStreetMap Streets, Google Satellite with Labels or Esri World Imagery with Labels to send the visible location to that provider. Map credits appear at the lower left. OpenStreetMap requires no key. Google and Esri may charge for requests. Keys stay in memory unless you choose Remember this key on this PC. Selecting Google or Esri automatically loads its saved key from Windows Credential Manager when there is no key for that provider in the current session. Use saved key reloads it manually. Switch the background to Off to stop map requests. Conversion remains available offline.
+
+1.9 Get a Google Maps API key
+1. Sign in to Google Cloud Console. Create or select a project and link it to an active Cloud Billing account.
+2. Enable Map Tiles API in that project’s API Library.
+3. Go to Google Maps Platform > Keys & Credentials and create an API key. Under API restrictions, select Map Tiles API for that key.
+4. In 12dAZ, open View > Background Map and select Google Satellite with Labels. Paste the key in Provider API key and select Set key.
+5. If the provider rejects the key, check that billing, API enablement and the key restrictions all use the same Google Cloud project.
+https://developers.google.com/maps/documentation/tile/get-api-key
+
+1.10 Get an Esri API key
+1. Sign in to your ArcGIS Location Platform portal.
+2. Go to Content > My Content > New item > Developer credentials and choose API key credentials.
+3. Set an expiration date. Under location services privileges, select both Basemaps and Static Basemap Tiles so the key can load imagery and labels.
+4. Complete the credential setup, generate the API key and copy the token. In 12dAZ, open View > Background Map, select Esri World Imagery with Labels, and paste the token in Provider API key. Select Set key.
+5. If imagery or labels fail to load, check both privileges and the expiration date. If you change privileges, regenerate the key in ArcGIS and update it in 12dAZ.
+https://developers.arcgis.com/documentation/security-and-authentication/api-key-authentication/tutorials/create-an-api-key/location-platform/
+
+1.11 About and support
 Help shows the installed version, license, and third-party notices offline. The brief splash closes automatically or with Continue, Enter or Escape. The optional PayPal link opens an external page only when selected.
 
 Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160

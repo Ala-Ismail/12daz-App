@@ -400,6 +400,14 @@ h3 {
 .geometry-content {
   padding-top: 6px;
 }
+#background-maps .map-preview {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+.map-preview figcaption a {
+  color: inherit;
+  text-decoration: underline;
+}
 .geometry-group + .geometry-group {
   border-top: 1px solid var(--line);
   margin-top: 26px;

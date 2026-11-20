@@ -1,13 +1,13 @@
 [package]
 name = "az12-converter"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 publish = false
 default-run = "az12-converter"
 
 [features]
-desktop = ["dep:eframe", "dep:rfd"]
+desktop = ["dep:chrono", "dep:eframe", "dep:ehttp", "dep:image", "dep:keyring", "dep:proj4rs", "dep:rfd", "dep:thiserror"]
 
 [[bin]]
 name = "12dAZ-Converter"
@@ -16,10 +16,14 @@ required-features = ["desktop"]
 
 [dependencies]
 acadrust = "=0.6.4"
+chrono = { version = "=0.4.45", default-features = false, features = ["std"], optional = true }
 clap = { version = "4.5", features = ["derive"] }
 ctrlc = "3.5"
 eframe = { version = "=0.36.2", default-features = false, features = ["accesskit", "default_fonts", "glow", "links"], optional = true }
+ehttp = { version = "=0.7.1", optional = true }
 encoding_rs = "=0.8.44"
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"], optional = true }
+proj4rs = { version = "=0.1.10", default-features = false, optional = true }
 regex = "1.12"
 rfd = { version = "=0.17.2", optional = true }
 same-file = "1.0"
@@ -27,12 +31,16 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 tempfile = "3.27"
+thiserror = { version = "2.0", optional = true }
 unicode-casefold = "0.2"
 uuid = { version = "1.27", features = ["v4"] }
 zip = { version = "=3.0.0", default-features = false, features = ["bzip2", "deflate-flate2-zlib-rs", "lzma"] }
 
 [build-dependencies]
 embed-resource = "3.0"
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"], optional = true }
 
 [target.'cfg(windows)'.dev-dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }

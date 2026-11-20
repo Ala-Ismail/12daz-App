@@ -2,6 +2,7 @@ use az12_converter::geometry::{Kind, Point};
 use az12_converter::preview::PreviewRecord;
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, Stroke, Vec2};
 
+use super::backdrop::Backdrop;
 use super::theme::{LINE, MUTED, TEXT};
 
 #[derive(Debug)]
@@ -102,12 +103,13 @@ impl View {
         records: &[&PreviewRecord],
         fit: bool,
         units: Option<&str>,
+        backdrop: &mut Backdrop,
     ) {
         let boundary = ui.clip_rect().intersect(ui.ctx().content_rect());
         let available = ((boundary.max - ui.cursor().min).min(ui.available_size())
-            - Vec2::new(0.0, 23.0))
+            - Vec2::new(0.0, 33.0))
         .max(Vec2::splat(32.0));
-        let (response, painter) = ui.allocate_painter(available, egui::Sense::drag());
+        let (response, painter) = ui.allocate_painter(available, egui::Sense::click_and_drag());
         let rect = response.rect;
         let center = rect.center();
         if fit || (self.viewport_size - rect.size()).length_sq() > 1.0 {
@@ -123,6 +125,12 @@ impl View {
             }
             self.drawing(center, point)
         });
+        if backdrop.picking()
+            && response.clicked()
+            && let Some(point) = response.interact_pointer_pos()
+        {
+            backdrop.pick_point(self.drawing(center, point));
+        }
         painter.rect_filled(rect, 5.0, Color32::from_rgb(11, 21, 37));
         let grid = Color32::from_rgb(20, 34, 52);
         for i in 1..(rect.width() / 52.0) as usize {
@@ -135,6 +143,7 @@ impl View {
         }
         painter.rect_stroke(rect, 5.0, Stroke::new(1.0, LINE), egui::StrokeKind::Inside);
         if records.is_empty() {
+            backdrop.map_status = None;
             painter.text(
                 center,
                 egui::Align2::CENTER_CENTER,
@@ -144,6 +153,12 @@ impl View {
             );
             return;
         }
+        let map_displayed = backdrop.paint(
+            &painter,
+            rect,
+            |point| self.drawing(center, point),
+            |point| self.screen(center, point),
+        );
         for record in records {
             let colour = preview_colour(&record.colour);
             let points = record
@@ -183,6 +198,11 @@ impl View {
                 }
             }
         }
+        let credits = if map_displayed {
+            backdrop.paint_credits(ui, &painter, rect)
+        } else {
+            None
+        };
         if rect.width() > 160.0 && rect.height() > 100.0 {
             let tip = rect.left_top() + Vec2::new(25.0, 16.0);
             painter.add(egui::Shape::convex_polygon(
@@ -197,7 +217,15 @@ impl View {
                 FontId::proportional(11.0),
                 TEXT,
             );
-            self.scale_bar(&painter, rect, units);
+            let mut scale_area = rect;
+            if let Some(credits) = credits
+                && credits.right() > rect.right() - 154.0
+            {
+                scale_area.max.y = credits.top();
+            }
+            if scale_area.height() > 50.0 {
+                self.scale_bar(&painter, scale_area, units);
+            }
         }
     }
 

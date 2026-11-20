@@ -198,12 +198,18 @@ pub fn capture(
     input: PathBuf,
     output: PathBuf,
     scale: f32,
+    mode: az12_converter::map::MapMode,
+    opacity: Option<f32>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use eframe::icon_data::IconDataExt;
 
     struct Capture {
         desktop: Desktop,
         frames: usize,
+        mode: az12_converter::map::MapMode,
+        opacity: Option<f32>,
+        provider_started: bool,
+        capture_sent: bool,
         result: Rc<RefCell<Option<Result<(), String>>>>,
         output: PathBuf,
     }
@@ -238,7 +244,33 @@ pub fn capture(
             if !self.desktop.state.waiting() {
                 self.desktop.state.units = Some("metres");
                 self.frames += 1;
-                if self.frames == 4 {
+                let ready = if self.mode != az12_converter::map::MapMode::Off {
+                    if !self.provider_started {
+                        if let Err(error) = self
+                            .desktop
+                            .backdrop
+                            .start_capture_provider(self.mode, self.opacity)
+                        {
+                            *self.result.borrow_mut() = Some(Err(error));
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                            return;
+                        }
+                        self.provider_started = true;
+                    }
+                    self.desktop.backdrop.capture_complete()
+                } else {
+                    true
+                };
+                if self.frames >= 500 && !ready {
+                    *self.result.borrow_mut() = Some(Err(self
+                        .desktop
+                        .backdrop
+                        .map_status
+                        .clone()
+                        .unwrap_or_else(|| "The map did not finish loading.".into())));
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                } else if !self.capture_sent && self.frames >= 4 && ready {
+                    self.capture_sent = true;
                     ui.ctx()
                         .send_viewport_cmd(egui::ViewportCommand::Screenshot(
                             egui::UserData::default(),
@@ -267,6 +299,10 @@ pub fn capture(
             Ok(Box::new(Capture {
                 desktop,
                 frames: 0,
+                mode,
+                opacity,
+                provider_started: false,
+                capture_sent: false,
                 result: capture_result,
                 output,
             }))

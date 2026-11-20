@@ -1,9 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backdrop;
 mod canvas;
+mod map_tiles;
 mod smoke;
 mod state;
 mod theme;
+mod tile_transport;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -37,7 +40,9 @@ enum Dialog {
 struct Desktop {
     state: State,
     view: View,
+    backdrop: backdrop::Backdrop,
     dialog: Option<Dialog>,
+    guide_section: usize,
     splash_until: Option<Instant>,
     splash_focused: bool,
     closing: bool,
@@ -58,7 +63,9 @@ impl Desktop {
         Self {
             state: State::default(),
             view: View::default(),
+            backdrop: backdrop::Backdrop::default(),
             dialog: None,
+            guide_section: 0,
             splash_until: splash.then(|| Instant::now() + Duration::from_millis(1800)),
             splash_focused: false,
             closing: false,
@@ -125,6 +132,7 @@ impl Desktop {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
+            ui.menu_button("View", |ui| self.backdrop.menu_item(ui));
             ui.menu_button("Help", |ui| {
                 for (label, dialog) in [
                     ("User Guide", Dialog::Guide),
@@ -377,23 +385,25 @@ impl Desktop {
                     ui.separator();
                     ui.label(RichText::new("Output file").strong().color(TEXT));
                     // Give Browse its measured width before filling the rest with the path field.
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .button("Browse")
-                            .on_hover_text("Browse for the output DXF")
-                            .clicked()
-                        {
-                            self.choose_output();
-                        }
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut self.state.output)
-                                .hint_text("Choose a DXF file…")
-                                .desired_width(f32::INFINITY),
-                        );
-                        if response.changed() {
-                            self.state.settings_changed();
-                        }
-                        response.on_hover_text(&self.state.output);
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .button("Browse")
+                                .on_hover_text("Browse for the output DXF")
+                                .clicked()
+                            {
+                                self.choose_output();
+                            }
+                            let response = ui.add(
+                                egui::TextEdit::singleline(&mut self.state.output)
+                                    .hint_text("Choose a DXF file…")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            if response.changed() {
+                                self.state.settings_changed();
+                            }
+                            response.on_hover_text(&self.state.output);
+                        });
                     });
                     ui.collapsing("Input options", |ui| {
                         ui.label("Fallback encoding");
@@ -442,6 +452,12 @@ impl Desktop {
     }
 
     fn preview(&mut self, ui: &mut egui::Ui) {
+        self.backdrop.sync_source(
+            self.state
+                .scan
+                .as_ref()
+                .map(|report| (report.input.as_path(), report.input_sha256.as_str())),
+        );
         ui.horizontal(|ui| {
             theme::heading(ui, "Plan preview");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -496,13 +512,21 @@ impl Desktop {
             &visible,
             std::mem::take(&mut self.state.fit_pending),
             self.state.units,
+            &mut self.backdrop,
         );
         ui.horizontal(|ui| {
-            let coordinates = self.view.cursor.map_or_else(
-                || "Drag to pan · scroll to zoom".into(),
-                |[x, y]| format!("X {x:.3}    Y {y:.3}"),
-            );
-            ui.add(egui::Label::new(RichText::new(coordinates).small().color(MUTED)).truncate());
+            let coordinates = if self.backdrop.picking() {
+                "Click a survey control point".into()
+            } else if let Some(status) = &self.backdrop.map_status {
+                status.to_owned()
+            } else {
+                self.view.cursor.map_or_else(
+                    || "Drag to pan · scroll to zoom".into(),
+                    |[x, y]| format!("X {x:.3}    Y {y:.3}"),
+                )
+            };
+            ui.add(egui::Label::new(RichText::new(&coordinates).small().color(MUTED)).truncate())
+                .on_hover_text(coordinates);
         });
     }
 
@@ -647,7 +671,7 @@ impl Desktop {
                 }
                 Dialog::Guide => {
                     ui.heading("User Guide");
-                    scroll_text(ui, GUIDE);
+                    user_guide(ui, &mut self.guide_section);
                 }
                 Dialog::License => {
                     ui.heading("License and Third-party Notices");
@@ -755,6 +779,7 @@ impl Desktop {
             .frame(theme::panel())
             .show(ui, |ui| self.preview(ui));
         self.show_dialog(&ctx);
+        self.backdrop.dialog(&ctx);
         self.splash(&ctx);
     }
 }
@@ -777,6 +802,49 @@ impl eframe::App for Desktop {
 
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         self.draw_ui(ui);
+    }
+}
+
+fn guide_sections(text: &str) -> Vec<(&str, Vec<&str>)> {
+    let mut sections: Vec<(&str, Vec<&str>)> = Vec::new();
+    for line in text.lines() {
+        let heading = line
+            .split_once(' ')
+            .and_then(|(index, _)| index.strip_prefix("1."))
+            .is_some_and(|index| index.parse::<usize>().is_ok());
+        if heading {
+            sections.push((line, Vec::new()));
+        } else if let Some((_, body)) = sections.last_mut() {
+            body.push(line);
+        }
+    }
+    sections
+}
+
+fn user_guide(ui: &mut egui::Ui, selected: &mut usize) {
+    let sections = guide_sections(GUIDE);
+    ui.set_width(520.0);
+    egui::ComboBox::from_label("Contents")
+        .selected_text(sections.get(*selected).map_or("", |(title, _)| *title))
+        .show_ui(ui, |ui| {
+            for (index, (title, _)) in sections.iter().enumerate() {
+                ui.selectable_value(selected, index, *title);
+            }
+        });
+    ui.separator();
+    if let Some((_, body)) = sections.get(*selected) {
+        egui::ScrollArea::vertical()
+            .id_salt(("user-guide", *selected))
+            .max_height(310.0)
+            .show(ui, |ui| {
+                for line in body.iter().copied().filter(|line| !line.is_empty()) {
+                    if line.starts_with("https://") {
+                        ui.hyperlink_to("Official setup instructions", line);
+                    } else {
+                        ui.add(egui::Label::new(line).selectable(true).wrap());
+                    }
+                }
+            });
     }
 }
 
@@ -821,7 +889,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .next()
             .and_then(|value| value.to_string_lossy().parse::<f32>().ok())
             .ok_or("Supply a display scale.")?;
-        return smoke::capture(PathBuf::from(fixture), PathBuf::from(output), scale);
+        use az12_converter::map::MapMode;
+        let mode = match args.next() {
+            None => MapMode::Off,
+            Some(flag) if flag == "--openstreetmap" => MapMode::Street,
+            Some(flag) if flag == "--google" => MapMode::Satellite,
+            Some(flag) if flag == "--esri" => MapMode::EsriSatellite,
+            Some(_) => return Err("Unknown capture option.".into()),
+        };
+        let opacity = args
+            .next()
+            .map(|value| {
+                value
+                    .to_string_lossy()
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|value| (0.1..=1.0).contains(value))
+                    .ok_or("Capture opacity must be between 0.1 and 1.0.")
+            })
+            .transpose()?;
+        return smoke::capture(
+            PathBuf::from(fixture),
+            PathBuf::from(output),
+            scale,
+            mode,
+            opacity,
+        );
     }
     let input = input.map(PathBuf::from);
     let mut viewport = egui::ViewportBuilder::default()
@@ -908,6 +1001,21 @@ mod tests {
                     "{label}: {bounds:?} at {scale}"
                 );
             }
+            let top = |label| {
+                nodes
+                    .iter()
+                    .find(|(_, node)| node.label() == Some(label) || node.value() == Some(label))
+                    .unwrap_or_else(|| panic!("missing {label} at {scale}"))
+                    .1
+                    .bounds()
+                    .unwrap()
+                    .y0
+            };
+            let browse_gap = top("Browse") - top("Output file");
+            assert!(
+                (0.0..=45.0).contains(&browse_gap),
+                "Browse is {browse_gap} points below its label at {scale}",
+            );
         }
     }
 
@@ -971,6 +1079,66 @@ mod tests {
                 "export panel width after dragging {width} at scale {scale}",
             );
         }
+    }
+
+    #[test]
+    fn view_menu_contains_background_map_and_replaces_the_preview_button() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut desktop = Desktop::new(&ctx, false);
+        let output = frame(&ctx, &mut desktop, 1.0, vec![]);
+        let nodes = output.platform_output.accesskit_update.unwrap().nodes;
+        assert!(nodes.iter().all(|(_, node)| node.label() != Some("Map…")));
+        let bounds = nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("View"))
+            .unwrap()
+            .1
+            .bounds()
+            .unwrap();
+        let pointer = egui::pos2(
+            ((bounds.x0 + bounds.x1) * 0.5) as f32,
+            ((bounds.y0 + bounds.y1) * 0.5) as f32,
+        );
+        for pressed in [true, false] {
+            frame(
+                &ctx,
+                &mut desktop,
+                1.0,
+                vec![
+                    egui::Event::PointerMoved(pointer),
+                    egui::Event::PointerButton {
+                        pos: pointer,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        let output = frame(&ctx, &mut desktop, 1.0, vec![]);
+        let nodes = output.platform_output.accesskit_update.unwrap().nodes;
+        assert!(
+            nodes
+                .iter()
+                .any(|(_, node)| node.label() == Some("Background Map"))
+        );
+    }
+
+    #[test]
+    fn user_guide_indexes_provider_setup_and_preserves_numbered_steps() {
+        let sections = guide_sections(GUIDE);
+        assert_eq!(sections.len(), 11);
+        for (index, (title, body)) in sections.iter().enumerate() {
+            assert!(title.starts_with(&format!("1.{} ", index + 1)));
+            assert!(!body.is_empty());
+        }
+        let google = sections[8].1.join("\n");
+        assert!(google.contains("1. Sign in") && google.contains("Map Tiles API"));
+        assert!(google.contains("https://developers.google.com/"));
+        let esri = sections[9].1.join("\n");
+        assert!(esri.contains("API key credentials") && esri.contains("Static Basemap Tiles"));
+        assert!(esri.contains("https://developers.arcgis.com/"));
     }
 
     #[test]

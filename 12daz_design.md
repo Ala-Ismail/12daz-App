@@ -1,5 +1,7 @@
 # 12dAZ Converter design
 
+The [map background design](design.md) specifies the future Rust preview overlay and its three providers.
+
 Status: design baseline with initial version 0.1.2 implemented, 14 November 2026. See [validation status](docs/validation_status.md) for actual evidence and outstanding release checks. Some options described below remain future scope.
 
 ## Implemented scope in version 0.1.2

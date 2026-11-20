@@ -64,6 +64,12 @@ try {
 
     $notice = [Text.StringBuilder]::new()
     $null = $notice.AppendLine('Third-party notices for the 12dAZ Converter Rust Windows x64 distribution.').AppendLine()
+    $null = $notice.AppendLine('=== CADCraft map code ===').AppendLine(
+        [IO.File]::ReadAllText((Join-Path $project 'rust/licenses/CADCraft-MIT.txt'))
+    ).AppendLine()
+    $null = $notice.AppendLine('=== Google Maps attribution artwork ===').AppendLine(
+        'Official Google Maps attribution artwork is displayed with Google Maps Platform tiles. See https://developers.google.com/maps/documentation/tile/policies.'
+    ).AppendLine()
     foreach ($package in @($seen | ForEach-Object { $byId[$_] } | Sort-Object name, version)) {
         if ($package.id -eq $root.id) { continue }
         $null = $notice.AppendLine("=== $($package.name) $($package.version) ===")
