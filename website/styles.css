@@ -400,13 +400,27 @@ h3 {
 .geometry-content {
   padding-top: 6px;
 }
-#background-maps .map-preview {
+.map-examples {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+#background-maps .map-examples .app-preview {
   margin-top: 0;
 }
-.map-preview figcaption a {
+.map-examples figcaption {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.map-examples figcaption a {
   color: inherit;
   text-decoration: underline;
+}
+@media (max-width: 700px) {
+  .map-examples {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .geometry-group + .geometry-group {
   border-top: 1px solid var(--line);
