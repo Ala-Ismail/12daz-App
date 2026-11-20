@@ -1,9 +1,16 @@
 use az12_converter::geometry::{Kind, Point};
-use az12_converter::preview::PreviewRecord;
+use az12_converter::preview::{PreviewRecord, SkippedElement};
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, Stroke, Vec2};
 
 use super::backdrop::Backdrop;
 use super::theme::{LINE, MUTED, TEXT};
+
+pub const SKIPPED_COLOUR: Color32 = Color32::from_rgb(255, 186, 87);
+
+pub struct SkipOverlay<'a> {
+    pub elements: &'a [SkippedElement],
+    pub highlighted: Option<usize>,
+}
 
 #[derive(Debug)]
 pub struct View {
@@ -29,10 +36,16 @@ impl Default for View {
 }
 
 impl View {
-    pub fn fit(&mut self, size: Vec2, records: &[&PreviewRecord]) {
+    pub fn fit(&mut self, size: Vec2, records: &[&PreviewRecord], skipped: &[SkippedElement]) {
         let mut points = records
             .iter()
-            .flat_map(|record| record.points.iter().copied());
+            .flat_map(|record| &record.points)
+            .chain(
+                skipped
+                    .iter()
+                    .flat_map(|element| element.paths.iter().flatten()),
+            )
+            .copied();
         let Some(first) = points.next() else {
             *self = Self::default();
             self.viewport_size = size;
@@ -74,6 +87,11 @@ impl View {
         self.zoom(if forward { 1.25 } else { 0.8 }, Vec2::ZERO);
     }
 
+    pub fn focus(&mut self, point: Point) {
+        self.origin = point;
+        self.pan = Vec2::ZERO;
+    }
+
     fn zoom(&mut self, factor: f64, anchor: Vec2) {
         let new = (self.scale * factor).clamp(self.fit_scale / 1000.0, self.fit_scale * 1000.0);
         self.pan = anchor + (self.pan - anchor) * (new / self.scale) as f32;
@@ -104,6 +122,7 @@ impl View {
         fit: bool,
         units: Option<&str>,
         backdrop: &mut Backdrop,
+        skipped: SkipOverlay<'_>,
     ) {
         let boundary = ui.clip_rect().intersect(ui.ctx().content_rect());
         let available = ((boundary.max - ui.cursor().min).min(ui.available_size())
@@ -113,7 +132,7 @@ impl View {
         let rect = response.rect;
         let center = rect.center();
         if fit || (self.viewport_size - rect.size()).length_sq() > 1.0 {
-            self.fit(rect.size(), records);
+            self.fit(rect.size(), records, skipped.elements);
         }
         if response.dragged() {
             self.pan += response.drag_delta();
@@ -142,7 +161,12 @@ impl View {
             painter.hline(rect.x_range(), y, Stroke::new(1.0, grid));
         }
         painter.rect_stroke(rect, 5.0, Stroke::new(1.0, LINE), egui::StrokeKind::Inside);
-        if records.is_empty() {
+        if records.is_empty()
+            && skipped
+                .elements
+                .iter()
+                .all(|element| element.paths.is_empty())
+        {
             backdrop.map_status = None;
             painter.text(
                 center,
@@ -198,6 +222,7 @@ impl View {
                 }
             }
         }
+        self.paint_skipped(&painter.with_clip_rect(rect), rect, skipped);
         let credits = if map_displayed {
             backdrop.paint_credits(ui, &painter, rect)
         } else {
@@ -225,6 +250,54 @@ impl View {
             }
             if scale_area.height() > 50.0 {
                 self.scale_bar(&painter, scale_area, units);
+            }
+        }
+    }
+
+    fn paint_skipped(&self, painter: &egui::Painter, rect: Rect, skipped: SkipOverlay<'_>) {
+        let dark = Color32::from_rgb(15, 22, 30);
+        for element in skipped.elements {
+            let highlighted = skipped.highlighted == Some(element.source_id);
+            let width = if highlighted { 3.0 } else { 1.6 };
+            for path in &element.paths {
+                if let [point] = path.as_slice() {
+                    let center = self.screen(rect.center(), *point);
+                    if rect.contains(center) {
+                        let radius = if highlighted { 6.0 } else { 4.0 };
+                        painter.circle(center, radius, dark, Stroke::new(width, SKIPPED_COLOUR));
+                    }
+                    continue;
+                }
+                let mut phase = 0.0;
+                for pair in path.windows(2) {
+                    let a = self.screen(rect.center(), pair[0]);
+                    let b = self.screen(rect.center(), pair[1]);
+                    let length = distance(a, b);
+                    if !length.is_finite() || length == 0.0 {
+                        continue;
+                    }
+                    if let Some([start, end]) = clip_segment(rect, a, b) {
+                        let visible_length = distance(start, end);
+                        if visible_length > 0.0 {
+                            let direction = (end - start) / visible_length;
+                            let mut dash = -(phase + distance(a, start)).rem_euclid(11.0);
+                            while dash < visible_length {
+                                let tip = (dash + 7.0).min(visible_length);
+                                if tip > 0.0 {
+                                    let points = [
+                                        start + direction * dash.max(0.0),
+                                        start + direction * tip,
+                                    ];
+                                    painter.line_segment(points, Stroke::new(width + 2.0, dark));
+                                    painter
+                                        .line_segment(points, Stroke::new(width, SKIPPED_COLOUR));
+                                }
+                                dash += 11.0;
+                            }
+                        }
+                    }
+                    phase = (phase + length.rem_euclid(11.0)).rem_euclid(11.0);
+                }
             }
         }
     }
@@ -267,6 +340,41 @@ impl View {
     }
 }
 
+fn distance(a: Pos2, b: Pos2) -> f32 {
+    (b.x - a.x).hypot(b.y - a.y)
+}
+
+fn clip_segment(rect: Rect, a: Pos2, b: Pos2) -> Option<[Pos2; 2]> {
+    let delta = b - a;
+    if !delta.x.is_finite() || !delta.y.is_finite() {
+        return None;
+    }
+    let (mut from, mut to) = (0.0_f32, 1.0_f32);
+    for (direction, distance) in [
+        (-delta.x, a.x - rect.left()),
+        (delta.x, rect.right() - a.x),
+        (-delta.y, a.y - rect.top()),
+        (delta.y, rect.bottom() - a.y),
+    ] {
+        if direction < 0.0 {
+            from = from.max(distance / direction);
+        } else if direction > 0.0 {
+            to = to.min(distance / direction);
+        } else if distance < 0.0 {
+            return None;
+        }
+    }
+    (from <= to).then(|| {
+        [from, to].map(|t| {
+            let point = a + delta * t;
+            Pos2::new(
+                point.x.clamp(rect.left(), rect.right()),
+                point.y.clamp(rect.top(), rect.bottom()),
+            )
+        })
+    })
+}
+
 fn preview_colour(name: &str) -> Color32 {
     match name.to_ascii_lowercase().as_str() {
         "red" | "1" => Color32::from_rgb(255, 116, 116),
@@ -298,7 +406,7 @@ mod tests {
         let mut view = View::default();
         let size = Vec2::new(800.0, 450.0);
         let center = Pos2::new(size.x / 2.0, size.y / 2.0);
-        view.fit(size, &[&geometry]);
+        view.fit(size, &[&geometry], &[]);
         let xy = original[0];
         let screen = view.screen(center, xy);
         view.zoom(2.0, screen - center);
@@ -306,5 +414,64 @@ mod tests {
         let projected = view.drawing(center, screen);
         assert!((projected[0] - xy[0]).abs() < 1e-6 && (projected[1] - xy[1]).abs() < 1e-6);
         assert_eq!(geometry.points, original);
+    }
+
+    #[test]
+    fn skip_04_overlay_clips_and_highlights_in_the_plan_view() {
+        let ctx = egui::Context::default();
+        let rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(480.0, 320.0));
+        let element = SkippedElement {
+            source_id: 1,
+            model: "Survey".into(),
+            kind: "super".into(),
+            line: 2,
+            reason: "Unknown elevation".into(),
+            paths: vec![
+                vec![[-1_000_000.0, 0.0], [1_000_000.0, 0.0]],
+                vec![[10.0, 20.0]],
+            ],
+            drawing_limited: false,
+        };
+        let mut view = View::default();
+        view.pan = Vec2::new(27.0, -12.0);
+        view.zoom(2.0, Vec2::ZERO);
+        let marker = view.screen(rect.center(), [10.0, 20.0]);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(rect),
+                ..Default::default()
+            },
+            |ui| {
+                let painter = ui.painter().with_clip_rect(rect);
+                painter.rect_filled(rect, 0.0, Color32::from_gray(170));
+                view.paint_skipped(
+                    &painter,
+                    rect,
+                    SkipOverlay {
+                        elements: std::slice::from_ref(&element),
+                        highlighted: Some(1),
+                    },
+                );
+            },
+        );
+        output.textures_delta.clear();
+        let mut dashes = 0;
+        let mut marker_found = false;
+        for clipped in output.shapes {
+            match clipped.shape {
+                egui::Shape::LineSegment { points, stroke } if stroke.color == SKIPPED_COLOUR => {
+                    assert!(points.into_iter().all(|point| rect.contains(point)));
+                    assert_eq!(stroke.width, 3.0);
+                    dashes += 1;
+                }
+                egui::Shape::Circle(circle) if circle.stroke.color == SKIPPED_COLOUR => {
+                    assert_eq!(circle.center, marker);
+                    assert_eq!(circle.radius, 6.0);
+                    marker_found = true;
+                }
+                _ => {}
+            }
+        }
+        assert!((2..60).contains(&dashes) && marker_found);
     }
 }

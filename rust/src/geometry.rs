@@ -850,6 +850,39 @@ fn primitive_geometry(
     }
 }
 
+pub(crate) fn skipped_location(source: &SourceEntity) -> Option<Point> {
+    let coordinates = match source.kind.as_str() {
+        "arc" => Some(("xstart", "ystart")),
+        "circle" => Some(("xcentre", "ycentre")),
+        "text" => Some(("x", "y")),
+        "super" | "2d" | "3d" | "polyline" => None,
+        _ => return None,
+    };
+    let props = fields(&source.block).ok()?;
+    if let Some((x, y)) = coordinates {
+        return Some([
+            numeric(&props, x, None, "X").ok()?,
+            numeric(&props, y, None, "Y").ok()?,
+        ]);
+    }
+    let mut blocks = ["data_2d", "data_3d", "data"]
+        .into_iter()
+        .filter_map(|key| props.get(key));
+    let Item::Block(block) = blocks.next()? else {
+        return None;
+    };
+    if blocks.next().is_some() {
+        return None;
+    }
+    let [Item::Token(x), Item::Token(y), ..] = block.items.as_slice() else {
+        return None;
+    };
+    Some([
+        number(Some(&x.value), "X").ok()?,
+        number(Some(&y.value), "Y").ok()?,
+    ])
+}
+
 pub fn convert_geometry(
     source: &SourceEntity,
     options: GeometryOptions,

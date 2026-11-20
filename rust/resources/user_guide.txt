@@ -17,10 +17,12 @@ Contents
 Choose File > Open archive, Ctrl+O, or Open archive in the title row. Select a ZIP .12daz containing one .12da payload, or a plain .12da file. The archive and conversion stay on this computer. Automatic decoding honours Unicode BOMs and otherwise uses strict UTF-8. For older files, open Input options and choose a fallback encoding.
 
 1.2 Select models
-The converter initially selects models with convertible geometry. Click a checkbox or focus it and press Space. Search filters the displayed rows and preserves hidden selections. Select all checks every convertible model. Use Report to see the full inventory and diagnostics.
+The converter initially selects models with geometry convertible in Flatten 2D. Click a checkbox or focus it and press Space. Search filters the displayed rows and preserves hidden selections. Select all checks every model. You can inspect a model even if all its elements are skipped. Use Report to see the full inventory and diagnostics.
 
 1.3 Inspect the plan preview
 Drag to pan, scroll to zoom, or choose a zoom percentage. Fit resets the extent to the selected models. The preview shares at most 30,000 display points across the selection. Selecting models refreshes the preview in the background. DXF export uses independent, full geometry.
+
+Choose View > Show skipped elements to open the skipped-elements window. Its count follows the selected models and current geometry settings. Dashed outlines and location markers appear on the plan while the window is open. Select an entry to highlight and centre its geometry. An entry without usable coordinates appears in the list with its reason. The count includes omitted detail when the preview allowance is reached. Close the window to hide the marks.
 
 1.4 Choose geometry and units
 Flatten 2D exports supported plan geometry at zero elevation. Keep Z retains verified elevations. Set positive plan and elevation tolerances for supported curve sampling. For arcs with differing endpoint elevations, enable Assume linear grade on arcs only if that assumption suits the source data. Select metres, millimetres, feet, or inches. Unit declaration leaves coordinates unchanged.

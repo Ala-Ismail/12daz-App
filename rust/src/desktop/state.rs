@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use az12_converter::archive::Limits;
 use az12_converter::error::{ConversionError, Result};
-use az12_converter::preview::PreviewRecord;
+use az12_converter::preview::{PreviewRecord, SkippedElement};
 use az12_converter::service::{Job, Options, PREVIEW_LIMIT, Report, run_job};
 use unicode_casefold::UnicodeCaseFold;
 
@@ -41,6 +41,9 @@ pub struct State {
     pub preview: Vec<PreviewRecord>,
     pub preview_simplified: bool,
     pub preview_omitted: Vec<String>,
+    pub skipped_count: Option<usize>,
+    pub skipped: Vec<SkippedElement>,
+    pub highlighted_skip: Option<usize>,
     pub fit_pending: bool,
     pub status: String,
     pub units: Option<&'static str>,
@@ -49,6 +52,7 @@ pub struct State {
     pub plan_tolerance: String,
     pub elevation_tolerance: String,
     pub linear_arc_elevations: bool,
+    has_exportable_geometry: bool,
     revision: u64,
     running: Option<Running>,
     pending: Option<Request>,
@@ -66,6 +70,9 @@ impl Default for State {
             preview: vec![],
             preview_simplified: false,
             preview_omitted: vec![],
+            skipped_count: None,
+            skipped: vec![],
+            highlighted_skip: None,
             fit_pending: true,
             status: "Open a local .12daz or .12da file to begin".into(),
             units: None,
@@ -74,6 +81,7 @@ impl Default for State {
             plan_tolerance: "0.01".into(),
             elevation_tolerance: "0.01".into(),
             linear_arc_elevations: false,
+            has_exportable_geometry: false,
             revision: 0,
             running: None,
             pending: None,
@@ -110,7 +118,7 @@ impl State {
         let path = Path::new(&self.output);
         !self.waiting()
             && self.scan.is_some()
-            && !self.selected.is_empty()
+            && self.has_exportable_geometry
             && self.units.is_some()
             && path
                 .extension()
@@ -140,7 +148,14 @@ impl State {
                     .into_owned();
             }
         }
+        self.geometry_changed();
+    }
+
+    pub fn geometry_changed(&mut self) {
         self.settings_changed();
+        if self.can_select() {
+            self.refresh_preview();
+        }
     }
 
     pub fn open(&mut self, path: PathBuf) {
@@ -159,6 +174,7 @@ impl State {
         self.preview.clear();
         self.preview_simplified = false;
         self.preview_omitted.clear();
+        self.clear_skip_analysis();
         self.units = None;
         self.fit_pending = true;
         self.pending = Some(Request {
@@ -183,11 +199,11 @@ impl State {
             return;
         }
         if !self.selected.remove(model) {
-            if !self.scan.iter().any(|scan| {
-                scan.models
-                    .iter()
-                    .any(|item| item.name == model && item.convertible > 0)
-            }) {
+            if !self
+                .scan
+                .iter()
+                .any(|scan| scan.models.iter().any(|item| item.name == model))
+            {
                 return;
             }
             self.selected.insert(model.into());
@@ -203,7 +219,6 @@ impl State {
             self.scan
                 .iter()
                 .flat_map(|scan| &scan.models)
-                .filter(|model| model.convertible > 0)
                 .map(|model| model.name.clone())
                 .collect()
         } else {
@@ -218,9 +233,26 @@ impl State {
     fn selection_changed(&mut self) {
         self.settings_changed();
         self.fit_pending = true;
+        self.refresh_preview();
+    }
+
+    fn clear_skip_analysis(&mut self) {
+        self.skipped_count = None;
+        self.skipped.clear();
+        self.highlighted_skip = None;
+        self.has_exportable_geometry = false;
+    }
+
+    fn refresh_preview(&mut self) {
         self.cancel();
         self.revision += 1;
-        if !self.selected.is_empty() {
+        self.clear_skip_analysis();
+        if self.selected.is_empty() {
+            self.preview.clear();
+            self.preview_simplified = false;
+            self.preview_omitted.clear();
+            self.status = "No models selected.".into();
+        } else {
             self.pending = Some(Request {
                 kind: Kind::Preview,
                 revision: self.revision,
@@ -246,15 +278,9 @@ impl State {
                 "Select convertible models, drawing units and a DXF destination.",
             ));
         }
-        let mut options = self.selection_options();
+        let mut options = self.selection_options()?;
         options.units = self.units.map(str::to_owned);
         options.overwrite = overwrite;
-        if self.keep_z {
-            options.geometry_mode = "keep-z".into();
-            options.plan_tolerance = tolerance(&self.plan_tolerance)?;
-            options.elevation_tolerance = tolerance(&self.elevation_tolerance)?;
-            options.linear_arc_elevations = self.linear_arc_elevations;
-        }
         self.start(
             Kind::Export,
             self.revision,
@@ -264,12 +290,19 @@ impl State {
         Ok(())
     }
 
-    fn selection_options(&self) -> Options {
-        Options {
+    fn selection_options(&self) -> Result<Options> {
+        let mut options = Options {
             models: Some(self.selected.iter().cloned().collect()),
             encoding: self.encoding.map(str::to_owned),
             ..Options::default()
+        };
+        if self.keep_z {
+            options.geometry_mode = "keep-z".into();
+            options.plan_tolerance = tolerance(&self.plan_tolerance)?;
+            options.elevation_tolerance = tolerance(&self.elevation_tolerance)?;
+            options.linear_arc_elevations = self.linear_arc_elevations;
         }
+        Ok(options)
     }
 
     fn start(&mut self, kind: Kind, revision: u64, options: Options, output: Option<PathBuf>) {
@@ -347,9 +380,17 @@ impl State {
             if let Some(result) = result {
                 let kind = job.kind;
                 let revision = job.revision;
+                let preview_cancelled = kind == Kind::Preview && job.cancel.load(Ordering::Relaxed);
                 self.running = None;
                 if revision == self.revision {
-                    self.finish(kind, result);
+                    self.finish(
+                        kind,
+                        if preview_cancelled {
+                            Err(ConversionError::Cancelled)
+                        } else {
+                            result
+                        },
+                    );
                 }
             }
         }
@@ -361,7 +402,13 @@ impl State {
         {
             let request = self.pending.take().expect("this request is due");
             let options = if request.kind == Kind::Preview {
-                self.selection_options()
+                match self.selection_options() {
+                    Ok(options) => options,
+                    Err(error) => {
+                        self.status = format!("Cannot analyse skipped elements · {error}");
+                        return;
+                    }
+                }
             } else {
                 Options {
                     encoding: self.encoding.map(str::to_owned),
@@ -383,8 +430,12 @@ impl State {
                         .map(|model| model.name.clone())
                         .collect();
                     self.accept_preview(&mut report);
+                    let recheck = self.keep_z || self.selected.len() != report.models.len();
                     self.scan = Some(report);
                     self.status = "Archive loaded".into();
+                    if recheck {
+                        self.refresh_preview();
+                    }
                 }
                 Kind::Preview => {
                     self.accept_preview(&mut report);
@@ -409,6 +460,9 @@ impl State {
         self.preview_simplified = report.preview_simplified;
         self.preview_omitted
             .clone_from(&report.preview_omitted_models);
+        self.skipped_count = Some(report.source_counts.skipped);
+        self.skipped = std::mem::take(&mut report.skipped_elements);
+        self.has_exportable_geometry = report.source_counts.selected > report.source_counts.skipped;
         self.fit_pending = true;
     }
 }
@@ -530,6 +584,7 @@ mod tests {
         state.keep_z = true;
         state.mode_changed();
         state.units = Some("metres");
+        settle(&mut state);
         assert_eq!(Path::new(&state.output), output);
         assert!(state.can_export());
         state.plan_tolerance = "invalid".into();
@@ -549,6 +604,61 @@ mod tests {
         settle(&mut state);
         assert!(state.status.contains("already exists"));
         assert_eq!(fs::read(&output).unwrap(), bytes);
+    }
+
+    #[test]
+    fn skip_03_and_05_refresh_analysis_for_latest_selection_and_settings() {
+        let folder = tempfile::tempdir().unwrap();
+        let input = folder.path().join("mixed.12da");
+        let mixed = concat!(
+            "model Survey string super { breakline line data_2d { 0 20 10 20 } }\n",
+            "model Utilities string future {}\n",
+        );
+        fs::write(&input, format!("{HEADER}{ROAD}{mixed}")).unwrap();
+        let mut state = State::default();
+        state.open(input);
+        settle(&mut state);
+        assert_eq!(state.selected, BTreeSet::from(["Survey".into()]));
+        assert_eq!(state.skipped_count, Some(0));
+
+        state.keep_z = true;
+        state.mode_changed();
+        state.pending.as_mut().unwrap().ready = Instant::now();
+        state.tick();
+        assert!(state.busy());
+        state.toggle("Utilities");
+        state.toggle("Survey");
+        assert_eq!(state.skipped_count, None);
+        settle(&mut state);
+        assert_eq!(state.selected, BTreeSet::from(["Utilities".into()]));
+        assert_eq!(state.skipped_count, Some(1));
+        assert_eq!(state.skipped[0].model, "Utilities");
+        assert!(state.preview.is_empty());
+        state.units = Some("metres");
+        assert!(!state.can_export());
+
+        state.select_all(true);
+        settle(&mut state);
+        assert_eq!(state.skipped_count, Some(2));
+        assert!(state.can_export());
+        state.plan_tolerance = "invalid".into();
+        state.geometry_changed();
+        settle(&mut state);
+        assert_eq!(state.skipped_count, None);
+        assert!(state.skipped.is_empty());
+        assert!(state.status.contains("positive finite"));
+        state.plan_tolerance = "0.01".into();
+        state.geometry_changed();
+        state.pending.as_mut().unwrap().ready = Instant::now();
+        state.tick();
+        state.cancel();
+        settle(&mut state);
+        assert_eq!(state.skipped_count, None);
+        assert_eq!(state.status, "Cancelled.");
+
+        state.select_all(false);
+        assert!(state.preview.is_empty() && state.skipped.is_empty());
+        assert_eq!(state.skipped_count, None);
     }
 
     #[test]

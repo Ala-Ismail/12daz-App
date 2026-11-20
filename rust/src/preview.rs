@@ -17,6 +17,19 @@ pub struct PreviewRecord {
     pub closed: bool,
 }
 
+#[derive(Debug)]
+pub struct SkippedElement {
+    pub source_id: usize,
+    pub model: String,
+    pub kind: String,
+    pub line: usize,
+    pub reason: String,
+    /// Paths are separate so unrelated parts are never connected.
+    /// A one-point path represents a source location.
+    pub paths: Vec<Vec<Point>>,
+    pub drawing_limited: bool,
+}
+
 fn segment_distance(point: Point, start: Point, end: Point) -> f64 {
     let (dx, dy) = (end[0] - start[0], end[1] - start[1]);
     let length = dx.hypot(dy);

@@ -71,6 +71,8 @@ For Keep Z, **Plan tolerance** and **Elevation tolerance** each default to **0.0
 
 **4D strings and contours are deferred.** TINs, meshes, symbols, rendered annotations and paper/screen-size text are unsupported. The report identifies skipped objects, omitted alignment labels and drainage attributes, and style substitutions. The GUI preview prioritizes bends, outlines and spatial coverage within a shared 30,000-point allowance. Export uses the selected geometry and tolerances independently of that allowance.
 
+In builds from the current source, **View → Show skipped elements** opens a small window showing what the selected models and geometry settings would skip. Inspect the reasons and select entries to locate them on the plan where usable coordinates are available.
+
 The reference survey produced equivalent Python and Rust reports and reopened geometry in both export modes. [Rust validation results](docs/rust_migration_validation.md)
 
 ## Test and build
@@ -96,7 +98,9 @@ The release workflow uses the Rust manifest where present and uses the Python bu
 ### Design and testing
 
 - [Converter design and original GUI concept](12daz_design.md)
-- [Background map integration design](design.md) and [background map test requirements](docs/background_map_test_requirements.md)
+- Plan preview design for [background map integration](design.md#1-background-maps) and the [skipped-elements preview](design.md#2-preview-of-skipped-elements)
+- [Background map test requirements](docs/background_map_test_requirements.md)
+- [Skipped-elements preview test requirements](docs/skipped_elements_test_requirements.md)
 - [Implementation steps](docs/implementation_steps.md), [product test requirements and cases](docs/test_requirements.md), and [expanded geometry fixture](tests/fixtures/expanded_geometry.md)
 
 ### Rust migration and validation

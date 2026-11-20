@@ -1,8 +1,10 @@
-# Map backgrounds for 12dAZ Converter
+# 12dAZ Converter plan preview design
+
+## 1. Background maps
 
 This design brings CadCraft’s MGA assignment, control-point alignment, and three online basemaps into the 12dAZ plan preview. Reuse CadCraft’s portable map code under its MIT license and adapt the viewport and application state to the 12dAZ Rust desktop. The [converter design](12daz_design.md) describes the archive and DXF workflow.
 
-## Desktop workflow
+### 1.1 Desktop workflow
 
 1. Open a `.12daz` or `.12da` file and select the models to preview.
 2. Open **View → Background Map**. Keep the default **Off**, or assign a source coordinate reference system (CRS) and confirm the source coordinate units.
@@ -12,7 +14,7 @@ This design brings CadCraft’s MGA assignment, control-point alignment, and thr
 
 List GDA2020 / MGA zones 46–56 (EPSG:7846–7856) and GDA94 / MGA zones 46–56 (EPSG:28346–28356), grouped by datum. Keep WGS 84 (EPSG:4326) as the interchange CRS and Web Mercator (EPSG:3857) for the tile grid. Do not infer datum, zone or units from coordinate magnitude. Reject non-finite points, duplicate control pairs and degenerate alignments. Check placement against an independently known point where available. [ICSM datum guidance](https://www.icsm.gov.au/sites/default/files/DatumMattersFactSheet3.pdf)
 
-## Providers
+### 1.2 Providers
 
 Use a single active provider with its own authentication, zoom limits, attribution and cache rules. A failure leaves the survey visible and reports the cause below the preview. The user chooses any replacement provider explicitly.
 
@@ -24,7 +26,7 @@ Use a single active provider with its own authentication, zoom limits, attributi
 
 Keep keys in memory by default. Offer an explicit **Remember key** option through the Windows credential store. When the user selects Google or Esri, load the saved key for that provider if the session has no active key. Show map attribution at the lower left with outlined text over the imagery. Never put provider credentials, session tokens or authenticated URLs in project files, reports, diagnostics or screenshots. Explain that enabling online maps sends the provider the visible tile coordinates and, where required, the viewport extent. Map Off and an unconfigured file make no map requests.
 
-## Rust integration
+### 1.3 Rust integration
 
 - Put typed CRS, source-unit conversion, registration and XYZ math in a UI-independent Rust module. Use `proj4rs` behind an allowlist of supported CRS definitions. Cache the projection objects. Verify datum operations against independent fixtures. Use the GDA94-to-GDA2020 conformal transform (EPSG:8048) before approximating GDA2020 geographic coordinates as WGS 84 for display. Label the overlay as visual context because it omits site-specific distortion and epoch corrections. [Geoscience Australia transform guidance](https://www.ga.gov.au/scientific-topics/positioning-navigation/positioning-australia/geodesy/transform-convert)
 - Use the existing plan preview’s screen-to-drawing transform to find the visible tile footprint and its drawing-to-screen transform to place tile meshes underneath survey records. Project tile positions through the inverse registration. Keep calculations in `f64` until screen placement. Check projected tile edges at broad zooms and subdivide a mesh if corner-only placement exceeds the display error tolerance. Preserve Fit extents and the existing preview geometry budget. [12dAZ preview canvas](rust/src/desktop/canvas.rs)
@@ -32,7 +34,7 @@ Keep keys in memory by default. Offer an explicit **Remember key** option throug
 - Keep source CRS, confirmed source units and optional controls per archive. Save only on explicit action in a versioned sidecar such as `survey.12daz.12daz-map.json`, bound to the source fingerprint. Write atomically. Warn on invalid, stale or unsupported sidecars and open the archive normally. Keep tiles, credentials and UI preferences out of the sidecar.
 - Keep map state in the desktop. The archive reader, CLI conversion, DXF encoder, survey coordinates and conversion report are independent of the basemap. Rendering, selecting or aligning a map never rewrites source or output geometry.
 
-## Implementation and acceptance
+### 1.4 Implementation and acceptance
 
 Use the [background map test requirements](docs/background_map_test_requirements.md) for fixtures, per-phase cases and the CadCraft coverage review.
 
@@ -44,3 +46,30 @@ Use the [background map test requirements](docs/background_map_test_requirements
 | 4. Package and regression | Compare reopened DXF geometry and conversion report counts and diagnostics across matching exports with the map off and with each provider active. Run offline Windows package smoke and native layout checks. Publish the map feature after all three providers pass, with user documentation on location disclosure, source units and alignment. |
 
 The CadCraft review used revision `39245810a9b2a0a1aee4adabba51ccf8a16b7eb7`. Its MGA selector and tile renderer are in `crates/ui-egui/src/map.rs`, its control-point commands are in `crates/engine/src/cmd/map.rs`, and its projection code is in `crates/map/src/lib.rs`. The provider caches are in `crates/ui-egui/src/map_tiles.rs`.
+
+## 2. Preview of skipped elements
+
+The skipped-elements preview lets users see which elements in the selected models the converter would skip with the current export settings, before writing a DXF.
+
+### 2.1 Desktop workflow
+
+- Open a small, non-modal **Skipped elements** window from **View → Show skipped elements**. Show the overlay while the window is open and allow users to keep working in the plan preview. Update the count when the selected models or geometry settings change, including **Flatten 2D**, **Keep Z**, tolerances and geometry assumptions.
+- Use a dashed outline for skipped elements with reliable plan geometry. Use a marker when the source provides only a reliable XY location, and list elements with no reliable XY information. Give the overlay a labelled legend that remains legible over an active background map.
+- Show the model, element type, source line and skip reason in the skipped-elements list. Selecting a drawable entry highlights it in the preview. The count includes list-only elements and elements whose outlines were omitted to fit the preview budget.
+- Count elements the converter skips entirely. Keep warnings about partial exports, approximations and lost attributes in the conversion report. An element can be skipped in **Keep Z** when its elevation is unknown and still be exportable in **Flatten 2D**.
+
+### 2.2 Rust integration
+
+- Reuse the conversion service's geometry decisions with the active export settings. Refresh the existing background preview job when they change and use its revision checks to discard stale results.
+- At the point where the converter skips a source element, retain its identity, reason and any reliable plan geometry or position needed by the desktop overlay. Reuse the existing model name, source ID and source line. Keep an accurate skip count even when detailed entries are bounded, and show when details are truncated. A failed job should surface its existing error state.
+- Derive the display geometry from valid source coordinates. A known vertex can anchor a marker when an unsupported curve cannot be drawn reliably. Avoid joining vertices with invented straight segments. Keep overlay geometry in drawing coordinates so it follows the existing pan, zoom and map registration.
+- Keep preview drawing within the shared 30,000-point allowance. Reserve display capacity for exportable geometry and expose skipped entries whose geometry could not be drawn within the allowance. The overlay is preview-only. Enabling it leaves the DXF, CLI and conversion report format unchanged.
+
+### 2.3 Acceptance criteria
+
+Use the [skipped-elements preview test requirements](docs/skipped_elements_test_requirements.md) for fixtures, test cases and test commands.
+
+- Use a mixed-model fixture to verify that counts and reasons match an actual export of the selected models with identical settings. Cover an element skipped only in **Keep Z**, a drawable skipped element, a marker-only element, and an element that can only appear in the list.
+- Switch models and export settings while preview work is in progress. Verify that the count, list and overlay match the latest selection and settings.
+- Verify that opening and closing the window shows and hides the overlay without resizing the plan. Verify that the overlay follows pan and zoom, remains identifiable over a background map, and respects the preview budget without changing the skip count.
+- Export with the overlay on and off. Verify equivalent reopened DXF geometry and conversion report results.

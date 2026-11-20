@@ -27,7 +27,15 @@ impl Smoke {
             return None;
         }
         if !self.export_started {
-            if state.scan.is_none() || state.selected.len() != 1 || state.preview.is_empty() {
+            if state.scan.is_none()
+                || state.selected.len() != 1
+                || state.preview.is_empty()
+                || state.skipped_count != Some(1)
+                || !state
+                    .skipped
+                    .first()
+                    .is_some_and(|item| item.paths == [vec![[105.0, 208.0]]])
+            {
                 return Some(Err(format!("Scan or preview failed: {}", state.status)));
             }
             state.units = Some("metres");
@@ -94,7 +102,7 @@ fn compare_cli(
         .arg(&output)
         .args(["--units", "metres", "--model", "Survey"])
         .output()?;
-    if !invocation.status.success() {
+    if invocation.status.code() != Some(2) {
         return Err(format!(
             "CLI smoke export failed: {}",
             String::from_utf8_lossy(&invocation.stderr)
@@ -103,6 +111,12 @@ fn compare_cli(
     }
     let cli: serde_json::Value = serde_json::from_slice(&invocation.stdout)?;
     let desktop = serde_json::to_value(gui)?;
+    if cli.get("skipped_elements").is_some()
+        || desktop.get("skipped_elements").is_some()
+        || gui.source_counts.skipped != 1
+    {
+        return Err("Skipped elements were not reported correctly.".into());
+    }
     for key in [
         "input_sha256",
         "options",
@@ -159,7 +173,11 @@ pub fn run(report: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let input = folder.path().join("測量 smoke test.12da");
     fs::write(
         &input,
-        "// archive_version \"15.01.08.60\"\nmodel Survey string 3d { breakline line data { 100 200 4 102 206 5 } }",
+        concat!(
+            "// archive_version \"15.01.08.60\"\n",
+            "model Survey string 3d { breakline line data { 100 200 4 102 206 5 } }\n",
+            "model Survey string circle { xcentre 105 ycentre 208 radius 0 }\n",
+        ),
     )?;
     let outcome = Rc::new(RefCell::new(None));
     let app_outcome = Rc::clone(&outcome);
@@ -172,6 +190,7 @@ pub fn run(report: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         },
         Box::new(move |creation| {
             let mut desktop = Desktop::new(&creation.egui_ctx, false);
+            desktop.show_skipped = true;
             desktop.state.open(input);
             Ok(Box::new(Smoke {
                 desktop,

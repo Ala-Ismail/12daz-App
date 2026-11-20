@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use az12_converter::service::VERSION;
 use eframe::egui::{self, Color32, RichText, Vec2};
 
-use canvas::View;
+use canvas::{SKIPPED_COLOUR, SkipOverlay, View};
 use state::{State, output_exists};
 use theme::{AMBER, BLUE, FIELD, GREEN, LINK, MUTED, PANEL, SHELL, TEXT};
 
@@ -41,6 +41,7 @@ struct Desktop {
     state: State,
     view: View,
     backdrop: backdrop::Backdrop,
+    show_skipped: bool,
     dialog: Option<Dialog>,
     guide_section: usize,
     splash_until: Option<Instant>,
@@ -64,6 +65,7 @@ impl Desktop {
             state: State::default(),
             view: View::default(),
             backdrop: backdrop::Backdrop::default(),
+            show_skipped: false,
             dialog: None,
             guide_section: 0,
             splash_until: splash.then(|| Instant::now() + Duration::from_millis(1800)),
@@ -132,7 +134,14 @@ impl Desktop {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
-            ui.menu_button("View", |ui| self.backdrop.menu_item(ui));
+            ui.menu_button("View", |ui| {
+                self.backdrop.menu_item(ui);
+                if ui.button("Show skipped elements…").clicked() {
+                    self.show_skipped = true;
+                    self.state.fit_pending = true;
+                    ui.close();
+                }
+            });
             ui.menu_button("Help", |ui| {
                 for (label, dialog) in [
                     ("User Guide", Dialog::Guide),
@@ -242,7 +251,7 @@ impl Desktop {
                                 ui.horizontal(|ui| {
                                     let width = (ui.available_width() - 48.0).max(60.0);
                                     let row = ui
-                                        .add_enabled_ui(enabled && model.convertible > 0, |ui| {
+                                        .add_enabled_ui(enabled, |ui| {
                                             if checked {
                                                 ui.visuals_mut().widgets.inactive.bg_fill = BLUE;
                                             }
@@ -264,10 +273,7 @@ impl Desktop {
                                     if row.changed() {
                                         toggled = Some(model.name.clone());
                                     }
-                                    let row = row.on_hover_text(&model.name);
-                                    if model.convertible == 0 {
-                                        row.on_disabled_hover_text("No supported geometry");
-                                    }
+                                    row.on_hover_text(&model.name);
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
@@ -307,7 +313,7 @@ impl Desktop {
             .max_height((ui.available_height() - 54.0).max(45.0))
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.add_enabled_ui(!self.state.busy(), |ui| {
+                ui.add_enabled_ui(self.state.can_open(), |ui| {
                     for (label, value) in [("DXF version", "DXF 2018"), ("Layers", "One per model")]
                     {
                         ui.horizontal(|ui| {
@@ -339,14 +345,14 @@ impl Desktop {
                             .text_edit_singleline(&mut self.state.plan_tolerance)
                             .changed()
                         {
-                            self.state.settings_changed();
+                            self.state.geometry_changed();
                         }
                         ui.label("Elevation tolerance");
                         if ui
                             .text_edit_singleline(&mut self.state.elevation_tolerance)
                             .changed()
                         {
-                            self.state.settings_changed();
+                            self.state.geometry_changed();
                         }
                         if ui
                             .checkbox(
@@ -355,7 +361,7 @@ impl Desktop {
                             )
                             .changed()
                         {
-                            self.state.settings_changed();
+                            self.state.geometry_changed();
                         }
                     }
                     ui.label("Drawing units");
@@ -513,6 +519,14 @@ impl Desktop {
             std::mem::take(&mut self.state.fit_pending),
             self.state.units,
             &mut self.backdrop,
+            SkipOverlay {
+                elements: if self.show_skipped {
+                    &self.state.skipped
+                } else {
+                    &[]
+                },
+                highlighted: self.state.highlighted_skip,
+            },
         );
         ui.horizontal(|ui| {
             let coordinates = if self.backdrop.picking() {
@@ -528,6 +542,99 @@ impl Desktop {
             ui.add(egui::Label::new(RichText::new(&coordinates).small().color(MUTED)).truncate())
                 .on_hover_text(coordinates);
         });
+    }
+
+    fn skipped_window(&mut self, ctx: &egui::Context) {
+        if !self.show_skipped {
+            return;
+        }
+        let mut open = self.show_skipped;
+        let screen = ctx.content_rect();
+        egui::Window::new("Skipped elements")
+            .open(&mut open)
+            .default_pos(egui::pos2((screen.right() - 366.0).max(8.0), 72.0))
+            .default_width(330.0)
+            .max_width(350.0)
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| self.skipped_list(ui));
+        if !open {
+            self.show_skipped = false;
+            self.state.highlighted_skip = None;
+            self.state.fit_pending = true;
+            ctx.request_repaint();
+        }
+    }
+
+    fn skipped_list(&mut self, ui: &mut egui::Ui) {
+        if self.state.input.is_none() {
+            ui.label("Open a survey to check for skipped elements.");
+            return;
+        }
+        if self.state.scan.is_some() && self.state.selected.is_empty() {
+            ui.label("Select models to check for skipped elements.");
+            return;
+        }
+        let Some(count) = self.state.skipped_count else {
+            let label = if self.state.waiting() {
+                "Checking for skipped elements…"
+            } else {
+                "Skipped-elements analysis unavailable"
+            };
+            ui.label(RichText::new(label).small().color(MUTED))
+                .on_hover_text(&self.state.status);
+            return;
+        };
+        if count == 0 {
+            ui.label("No elements will be skipped with the current settings.");
+            return;
+        }
+        let noun = if count == 1 { "element" } else { "elements" };
+        ui.label(RichText::new(format!("{count} {noun} will be skipped")).strong());
+        ui.label(
+            RichText::new("Dashed outline or location marker in the plan")
+                .small()
+                .color(SKIPPED_COLOUR),
+        );
+        if self.state.skipped.len() < count {
+            ui.label(format!(
+                "Showing details for {} of {count}",
+                self.state.skipped.len()
+            ));
+        }
+        egui::ScrollArea::vertical()
+            .id_salt("skipped-elements")
+            .max_height(160.0)
+            .show(ui, |ui| {
+                let mut focus = None;
+                for element in &self.state.skipped {
+                    let detail = if element.drawing_limited {
+                        " · drawing limited by preview budget"
+                    } else if element.paths.is_empty() {
+                        " · no drawable position"
+                    } else {
+                        ""
+                    };
+                    let label = format!(
+                        "{} · {} · line {}\n{}{detail}",
+                        element.model, element.kind, element.line, element.reason
+                    );
+                    let point = element.paths.first().and_then(|path| path.first()).copied();
+                    if ui
+                        .selectable_label(
+                            self.state.highlighted_skip == Some(element.source_id),
+                            label,
+                        )
+                        .clicked()
+                    {
+                        self.state.highlighted_skip = Some(element.source_id);
+                        focus = point;
+                    }
+                }
+                if let Some(point) = focus {
+                    self.view.focus(point);
+                }
+            });
     }
 
     fn status(&mut self, ui: &mut egui::Ui) {
@@ -778,6 +885,7 @@ impl Desktop {
         egui::CentralPanel::default()
             .frame(theme::panel())
             .show(ui, |ui| self.preview(ui));
+        self.skipped_window(&ctx);
         self.show_dialog(&ctx);
         self.backdrop.dialog(&ctx);
         self.splash(&ctx);
@@ -976,6 +1084,62 @@ mod tests {
             repeat: false,
             modifiers,
         }
+    }
+
+    #[test]
+    fn skip_04_view_menu_opens_and_closes_without_resizing_the_plan() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut desktop = Desktop::new(&ctx, false);
+        let control = |output: &egui::FullOutput, label| {
+            let node = output
+                .platform_output
+                .accesskit_update
+                .as_ref()
+                .unwrap()
+                .nodes
+                .iter()
+                .find(|(_, node)| node.label() == Some(label))
+                .unwrap_or_else(|| panic!("missing {label}"));
+            node.0
+        };
+        let click = |desktop: &mut Desktop, target_node| {
+            frame(
+                &ctx,
+                desktop,
+                1.0,
+                vec![egui::Event::AccessKitActionRequest(
+                    egui::accesskit::ActionRequest {
+                        action: egui::accesskit::Action::Click,
+                        target_node,
+                        target_tree: egui::accesskit::TreeId::ROOT,
+                        data: None,
+                    },
+                )],
+            )
+        };
+        let canvas = |output: &egui::FullOutput| {
+            output
+                .shapes
+                .iter()
+                .find_map(|clipped| match &clipped.shape {
+                    egui::Shape::Rect(shape) if shape.fill == Color32::from_rgb(11, 21, 37) => {
+                        Some(shape.rect)
+                    }
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let first = frame(&ctx, &mut desktop, 1.0, vec![]);
+        let initial = frame(&ctx, &mut desktop, 1.0, vec![]);
+        assert!(!desktop.show_skipped);
+        let menu = click(&mut desktop, control(&first, "View"));
+        let popup = click(&mut desktop, control(&menu, "Show skipped elements…"));
+        assert!(desktop.show_skipped);
+        assert_eq!(canvas(&initial), canvas(&popup));
+        let closed = click(&mut desktop, control(&popup, "Close window"));
+        assert!(!desktop.show_skipped);
+        assert_eq!(canvas(&initial), canvas(&closed));
     }
 
     #[test]

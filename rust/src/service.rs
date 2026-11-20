@@ -15,12 +15,15 @@ use unicode_casefold::UnicodeCaseFold;
 use crate::archive::{Limits, Metadata, input_hash, open_input};
 use crate::dxf::{DxfWriter, validate_dxf};
 use crate::error::{ConversionError, Result, checkpoint};
-use crate::geometry::{GeometryError, GeometryOptions, convert_geometry, preview_points, repr};
+use crate::geometry::{
+    GeometryError, GeometryOptions, Point, convert_geometry, preview_points, repr, skipped_location,
+};
 use crate::parser::{SourceEntity, iter_entities};
-use crate::preview::{PreviewCollector, PreviewRecord};
+use crate::preview::{PreviewCollector, PreviewRecord, SkippedElement};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const PREVIEW_LIMIT: usize = 30_000;
+const SKIPPED_DETAIL_LIMIT: usize = 500;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Options {
@@ -123,6 +126,8 @@ pub struct Report {
     pub bounds_note: &'static str,
     #[serde(skip)]
     pub preview: Vec<PreviewRecord>,
+    #[serde(skip)]
+    pub skipped_elements: Vec<SkippedElement>,
     pub preview_simplified: bool,
     pub preview_omitted_models: Vec<String>,
     pub preview_note: &'static str,
@@ -314,6 +319,8 @@ struct Accumulation<'a> {
     diagnostics: Diagnostics,
     bounds: Option<[f64; 4]>,
     preview: PreviewCollector<'a>,
+    skipped_elements: Vec<SkippedElement>,
+    skipped_point_budget: Option<usize>,
     writer: Option<DxfWriter>,
 }
 
@@ -350,6 +357,22 @@ impl Accumulation<'_> {
             Err(GeometryError::Unsupported(reason)) => {
                 self.counts.skipped += 1;
                 warn("UNSUPPORTED_OR_INVALID_GEOMETRY", &reason);
+                if let Some(budget) = &mut self.skipped_point_budget
+                    && self.skipped_elements.len() < SKIPPED_DETAIL_LIMIT
+                {
+                    let (paths, drawing_limited) =
+                        skipped_paths(&source, geometry, *budget, cancel)?;
+                    *budget -= paths.iter().map(Vec::len).sum::<usize>();
+                    self.skipped_elements.push(SkippedElement {
+                        source_id: source.ordinal,
+                        model: source.model,
+                        kind: source.kind,
+                        line: source.line,
+                        reason,
+                        paths,
+                        drawing_limited,
+                    });
+                }
                 return Ok(());
             }
             Err(GeometryError::Input(error)) => return Err(error),
@@ -383,7 +406,68 @@ impl Accumulation<'_> {
     }
 }
 
+fn skipped_paths(
+    source: &SourceEntity,
+    geometry: GeometryOptions,
+    budget: usize,
+    cancel: Option<&AtomicBool>,
+) -> Result<(Vec<Vec<Point>>, bool)> {
+    if budget == 0 {
+        return Ok((Vec::new(), true));
+    }
+    let mut limited = false;
+    if geometry.keep_z {
+        let plan_options = GeometryOptions {
+            keep_z: false,
+            ..geometry
+        };
+        match convert_geometry(source, plan_options, &mut |_, _| {}, cancel) {
+            Ok(parts) => {
+                let mut paths = Vec::new();
+                let mut remaining = budget;
+                for part in parts {
+                    checkpoint(cancel)?;
+                    if part.points.len() > remaining {
+                        limited = true;
+                        break;
+                    }
+                    let Ok(points) = preview_points(&part) else {
+                        continue;
+                    };
+                    if !points
+                        .iter()
+                        .flatten()
+                        .all(|coordinate| coordinate.is_finite())
+                    {
+                        continue;
+                    }
+                    if points.len() > remaining {
+                        limited = true;
+                        break;
+                    }
+                    remaining -= points.len();
+                    if part.kind == crate::geometry::Kind::Point {
+                        paths.extend(points.into_iter().map(|point| vec![point]));
+                    } else if !points.is_empty() {
+                        paths.push(points);
+                    }
+                }
+                if !limited && !paths.is_empty() {
+                    return Ok((paths, false));
+                }
+            }
+            Err(GeometryError::Unsupported(_)) => {}
+            Err(GeometryError::Input(_)) => checkpoint(cancel)?,
+        }
+    }
+    Ok((
+        skipped_location(source).map_or_else(Vec::new, |point| vec![vec![point]]),
+        limited,
+    ))
+}
+
 pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
+    let inspect_skipped = job.output.is_none() && job.preview_limit > 0;
     let geometry = geometry_options(options)?;
     let start = Instant::now();
     let default_report = job.output.filter(|_| job.report.is_none()).map(report_path);
@@ -414,6 +498,8 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
         diagnostics: Diagnostics::default(),
         bounds: None,
         preview: PreviewCollector::new(job.preview_limit, job.cancel),
+        skipped_elements: Vec::new(),
+        skipped_point_budget: inspect_skipped.then_some(job.preview_limit / 5),
         writer,
     };
     let stage = if job.output.is_some() {
@@ -466,6 +552,7 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
         mut diagnostics,
         bounds,
         preview,
+        mut skipped_elements,
         writer,
         ..
     } = accumulation;
@@ -495,6 +582,21 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
         ));
     }
     let preview = preview.finish()?;
+    let displayed = preview
+        .records
+        .iter()
+        .map(|record| record.points.len())
+        .sum::<usize>();
+    let mut remaining = job.preview_limit.saturating_sub(displayed);
+    for element in &mut skipped_elements {
+        let points = element.paths.iter().map(Vec::len).sum::<usize>();
+        if points > remaining {
+            element.paths.clear();
+            element.drawing_limited = true;
+        } else {
+            remaining -= points;
+        }
+    }
     let mut result = Report {
         schema_version: 1,
         job_id: uuid::Uuid::new_v4().to_string(),
@@ -509,6 +611,7 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
         bounds,
         bounds_note: "Preview bounds; curved extents sampled for display.",
         preview: preview.records,
+        skipped_elements,
         preview_simplified: preview.limited,
         preview_omitted_models: preview.omitted_models,
         preview_note: "Preview prioritizes path shape and spatial coverage within the shared display allowance. DXF export uses independent geometry.",
