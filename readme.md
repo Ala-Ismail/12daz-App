@@ -4,9 +4,9 @@ Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Ex
 
 **v0.3.0** adds [background maps](#background-maps) to the Rust desktop plan preview. The Windows ZIP includes the desktop app and command-line converter. Clean-machine verification is tracked separately. [Download v0.3.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.3.0) · [Rust validation results](docs/rust_migration_validation.md)
 
-![12dAZ Converter v0.2.0 showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
+![12dAZ Converter v0.3.0 showing synthetic road, property and utility linework over OpenStreetMap](website/assets/12daz-converter-mga55-openstreetmap.png)
 
-*Screenshot uses synthetic demonstration data.*
+*Synthetic MGA Zone 55 survey with the basemap at 50% opacity.* [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)
 
 ## Code signing status and Windows warning
 
@@ -34,7 +34,7 @@ Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extr
 
 Maps are off by default. When enabled, the selected provider receives requests for the visible map area. The basemap serves as a visual reference in the plan preview. DXF export runs offline and preserves the source coordinates.
 
-[Website examples](https://12daz-app-website.vercel.app/#background-maps) · [Background map integration design](design.md) · [Background map test requirements](docs/background_map_test_requirements.md)
+[Website examples](https://12daz-app-website.vercel.app/#background-maps)
 
 ## Run from source
 
@@ -93,16 +93,23 @@ The release workflow uses the Rust manifest where present and uses the Python bu
 
 ## Project documents
 
-- [Design and original GUI concept](12daz_design.md).
-- [Historical v0.1.5 GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
-- [Implementation steps](docs/implementation_steps.md).
-- [Python-to-Rust migration plan](docs/rust_migration_plan.md).
-- [Rust migration test requirements](docs/rust_migration_test_requirements.md).
-- [Test requirements and cases](docs/test_requirements.md).
-- [Rust validation results](docs/rust_migration_validation.md) and [historical Python results](docs/validation_status.md).
-- [Code signing policy](docs/code_signing_policy.md).
-- [SignPath signing flow and setup](docs/signpath_setup.md), with an [application preparation packet](docs/signpath_application.md) for maintainer review.
-- [Project agent guidance](.agent).
+### Design and testing
+
+- [Converter design and original GUI concept](12daz_design.md)
+- [Background map integration design](design.md) and [background map test requirements](docs/background_map_test_requirements.md)
+- [Implementation steps](docs/implementation_steps.md), [product test requirements and cases](docs/test_requirements.md), and [expanded geometry fixture](tests/fixtures/expanded_geometry.md)
+
+### Rust migration and validation
+
+- [Python-to-Rust migration plan](docs/rust_migration_plan.md), [migration test requirements](docs/rust_migration_test_requirements.md), and [Rust validation results](docs/rust_migration_validation.md)
+- [Python parity baseline](docs/rust_migration_baseline.md), [historical v0.1.3 validation results](docs/validation_status.md), and [historical v0.1.5 GUI screenshot](website/assets/12daz-converter-gui.png)
+
+### Releases and website
+
+- [GitHub build and release steps](docs/github_release.md) and [code signing policy](docs/code_signing_policy.md)
+- [Azure publisher signing setup](docs/code_signing.md), [SignPath setup](docs/signpath_setup.md), and [SignPath application preparation](docs/signpath_application.md)
+- [Website maintenance](website/README.md) and [website design](website/website_design.md)
+- [Project agent guidance](.agent)
 
 Keep private inputs in ignored `sample/` and generated drawings and local reports in ignored `outputs/`.
 

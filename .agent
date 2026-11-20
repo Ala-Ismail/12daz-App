@@ -10,9 +10,18 @@ Maintain the offline Windows x64 12daz/12da to DXF 2018 converter. The first pub
 - rust/Cargo.toml defines the active application version, dependencies, and Windows desktop feature.
 - rust/src contains the Rust archive reader, parser, geometry routines, preview, DXF backend and conversion service. rust/src/main.rs is the CLI and rust/src/desktop is the native GUI.
 - 12daz_design.md describes the archive and conversion behaviour. docs/test_requirements.md defines the product requirements.
+- design.md and docs/background_map_test_requirements.md describe the Rust desktop background map integration and its test cases.
 - docs/rust_migration_plan.md, docs/rust_migration_test_requirements.md, and docs/rust_migration_validation.md record the migration and its qualification.
 - src/az12_converter and docs/rust_migration_baseline.md preserve the historical Python reference for parity tests and earlier release tags.
 - website/ contains the product pages and public download links.
+
+## README maintenance
+
+Keep the overview and **Project documents** section in `readme.md` current. When adding, moving, renaming, superseding or removing a project document, update the README links and descriptions in the same change. Review the relevant README sections whenever features, setup steps, validation status or releases change. Before finishing, check that local links resolve and that descriptions reflect the current source and published release.
+
+## Markdown document structure
+
+Number sections in project Markdown documents. Leave the document title unnumbered. Start main sections at `1.`, `2.`, and so on. Number subsections by their parent section, such as `1.1`, `1.2`, and `2.1`. When headings are added, removed, or moved, update the numbering and check any links to affected headings.
 
 ## Agreed scope
 
@@ -31,7 +40,7 @@ Use the case IDs in docs/test_requirements.md and docs/rust_migration_test_requi
 ```powershell
 cargo test --manifest-path rust/Cargo.toml --locked --features desktop
 .\scripts\build_rust_windows.ps1
-.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.2.1-Windows-x64.zip
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.3.0-Windows-x64.zip
 ```
 
 Use Python 3.11 with the pinned ezdxf version for the independent audit and parity tests. Set `RUST_MIGRATION_CLI` to the built CLI and run `python -m unittest discover -s tests -p test_rust_migration.py -v`. Record executed results, CAD interoperability, package evidence and benchmark hardware. Use .github/workflows/test.yml for Windows release builds and docs/github_release.md for tagging and signing steps. Change public version and download links after verifying the corresponding release assets.
