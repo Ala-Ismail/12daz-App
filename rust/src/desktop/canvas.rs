@@ -2,6 +2,8 @@ use az12_converter::geometry::{Kind, Point};
 use az12_converter::preview::PreviewRecord;
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, Stroke, Vec2};
 
+use super::theme::{LINE, MUTED, TEXT};
+
 #[derive(Debug)]
 pub struct View {
     origin: Point,
@@ -47,8 +49,8 @@ impl View {
         self.fit_scale = if low == high {
             1.0
         } else {
-            ((f64::from((size.x - 32.0).max(1.0)) / width)
-                .min(f64::from((size.y - 32.0).max(1.0)) / height))
+            ((f64::from((size.x - 72.0).max(1.0)) / width)
+                .min(f64::from((size.y - 72.0).max(1.0)) / height))
             .min(1e8)
         };
         self.scale = self.fit_scale;
@@ -65,6 +67,10 @@ impl View {
             f64::from(percent) / 100.0 * self.fit_scale / self.scale,
             Vec2::ZERO,
         );
+    }
+
+    pub fn zoom_step(&mut self, forward: bool) {
+        self.zoom(if forward { 1.25 } else { 0.8 }, Vec2::ZERO);
     }
 
     fn zoom(&mut self, factor: f64, anchor: Vec2) {
@@ -98,9 +104,9 @@ impl View {
         units: Option<&str>,
     ) {
         let boundary = ui.clip_rect().intersect(ui.ctx().content_rect());
-        let available = (boundary.max - ui.cursor().min)
-            .min(ui.available_size())
-            .max(Vec2::splat(32.0));
+        let available = ((boundary.max - ui.cursor().min).min(ui.available_size())
+            - Vec2::new(0.0, 23.0))
+        .max(Vec2::splat(32.0));
         let (response, painter) = ui.allocate_painter(available, egui::Sense::drag());
         let rect = response.rect;
         let center = rect.center();
@@ -117,23 +123,24 @@ impl View {
             }
             self.drawing(center, point)
         });
-        painter.rect_filled(rect, 3.0, Color32::from_rgb(24, 27, 32));
-        let grid = Color32::from_rgb(34, 38, 43);
-        for i in 1..(rect.width() / 32.0) as usize {
-            let x = rect.left() + i as f32 * 32.0;
+        painter.rect_filled(rect, 5.0, Color32::from_rgb(11, 21, 37));
+        let grid = Color32::from_rgb(20, 34, 52);
+        for i in 1..(rect.width() / 52.0) as usize {
+            let x = rect.left() + i as f32 * 52.0;
             painter.vline(x, rect.y_range(), Stroke::new(1.0, grid));
         }
-        for i in 1..(rect.height() / 32.0) as usize {
-            let y = rect.top() + i as f32 * 32.0;
+        for i in 1..(rect.height() / 52.0) as usize {
+            let y = rect.top() + i as f32 * 52.0;
             painter.hline(rect.x_range(), y, Stroke::new(1.0, grid));
         }
+        painter.rect_stroke(rect, 5.0, Stroke::new(1.0, LINE), egui::StrokeKind::Inside);
         if records.is_empty() {
             painter.text(
                 center,
                 egui::Align2::CENTER_CENTER,
                 "Select models to preview geometry",
                 FontId::proportional(14.0),
-                Color32::GRAY,
+                MUTED,
             );
             return;
         }
@@ -146,7 +153,15 @@ impl View {
             match record.kind {
                 Kind::Point => {
                     for point in points {
-                        painter.circle_filled(point, 3.0, colour);
+                        let stroke = Stroke::new(1.0, colour);
+                        painter.line_segment(
+                            [point - Vec2::new(3.0, 0.0), point + Vec2::new(3.0, 0.0)],
+                            stroke,
+                        );
+                        painter.line_segment(
+                            [point - Vec2::new(0.0, 3.0), point + Vec2::new(0.0, 3.0)],
+                            stroke,
+                        );
                     }
                 }
                 Kind::Text => {
@@ -168,11 +183,26 @@ impl View {
                 }
             }
         }
-        self.scale_bar(&painter, rect, units);
+        if rect.width() > 160.0 && rect.height() > 100.0 {
+            let tip = rect.left_top() + Vec2::new(25.0, 16.0);
+            painter.add(egui::Shape::convex_polygon(
+                vec![tip, tip + Vec2::new(9.0, 23.0), tip + Vec2::new(-9.0, 23.0)],
+                TEXT,
+                Stroke::NONE,
+            ));
+            painter.text(
+                tip + Vec2::new(0.0, 28.0),
+                egui::Align2::CENTER_TOP,
+                "+Y",
+                FontId::proportional(11.0),
+                TEXT,
+            );
+            self.scale_bar(&painter, rect, units);
+        }
     }
 
     fn scale_bar(&self, painter: &egui::Painter, rect: Rect, units: Option<&str>) {
-        let target = 90.0 / self.scale;
+        let target = 116.0 / self.scale;
         let base = 10.0_f64.powf(target.log10().floor());
         let length = if target / base >= 5.0 {
             5.0 * base
@@ -181,23 +211,31 @@ impl View {
         } else {
             base
         };
-        let start = rect.left_bottom() + Vec2::new(16.0, -16.0);
-        let end = start + Vec2::new((length * self.scale) as f32, 0.0);
-        let stroke = Stroke::new(1.0, Color32::LIGHT_GRAY);
+        let suffix = match units {
+            Some("metres") => " m",
+            Some("millimetres") => " mm",
+            Some("feet") => " ft",
+            Some("inches") => " in",
+            _ => "",
+        };
+        let end = rect.right_bottom() - Vec2::new(26.0, 16.0);
+        let start = end - Vec2::new((length * self.scale) as f32, 0.0);
+        let stroke = Stroke::new(1.0, TEXT);
         painter.line_segment([start, end], stroke);
-        for x in [start.x, end.x] {
-            painter.line_segment(
-                [Pos2::new(x, start.y - 4.0), Pos2::new(x, start.y + 4.0)],
-                stroke,
+        for (x, label) in [
+            (start.x, "0".into()),
+            ((start.x + end.x) / 2.0, format!("{}", length / 2.0)),
+            (end.x, format!("{length}{suffix}")),
+        ] {
+            painter.line_segment([Pos2::new(x, start.y - 5.0), Pos2::new(x, start.y)], stroke);
+            painter.text(
+                Pos2::new(x, start.y - 8.0),
+                egui::Align2::CENTER_BOTTOM,
+                label,
+                FontId::proportional(11.0),
+                TEXT,
             );
         }
-        painter.text(
-            start + Vec2::new(0.0, -6.0),
-            egui::Align2::LEFT_BOTTOM,
-            format!("{length} {}", units.unwrap_or("drawing units")),
-            FontId::proportional(11.0),
-            Color32::LIGHT_GRAY,
-        );
     }
 }
 

@@ -115,6 +115,22 @@ jobs:
       - name: Run Rust core and desktop tests
         if: steps.package.outputs.implementation == 'rust'
         run: cargo test --manifest-path rust/Cargo.toml --locked --features desktop
+      - name: Prepare software OpenGL for the hosted desktop smoke test
+        if: steps.package.outputs.implementation == 'rust'
+        shell: pwsh
+        run: |
+          $mesa = Join-Path $env:RUNNER_TEMP 'mesa-26.2.2'
+          $archive = "$mesa.7z"
+          $url = 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.2/mesa3d-26.2.2-release-msvc.7z'
+          curl.exe -fLsS --retry 3 $url -o $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $expected = '0f21394d44036019bb5c07a3788dd278fd7b7b3469077a4686f0d639e8e874a1'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw 'Mesa distribution checksum mismatch'
+          }
+          & 7z x $archive "-o$mesa" x64/opengl32.dll x64/libgallium_wgl.dll -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "SMOKE_OPENGL=$(Join-Path $mesa x64)" >> $env:GITHUB_ENV
       - name: Build and test Rust portable package
         if: steps.package.outputs.implementation == 'rust'
         shell: pwsh
@@ -124,7 +140,7 @@ jobs:
           $null = New-Item -ItemType Directory -Force -Path outputs
           ./scripts/build_rust_windows.ps1 -OutputDirectory dist
           $archive = "dist/$env:PACKAGE_NAME.zip"
-          ./scripts/test_rust_windows_package.ps1 -Archive $archive -Evidence outputs/rust-package-smoke.json
+          ./scripts/test_rust_windows_package.ps1 -Archive $archive -Evidence outputs/rust-package-smoke.json -SoftwareOpenGlDirectory $env:SMOKE_OPENGL
           Expand-Archive -LiteralPath $archive -DestinationPath dist
           $env:RUST_MIGRATION_CLI = (Resolve-Path rust/target/x86_64-pc-windows-msvc/release/az12-converter.exe).Path
           python -m unittest discover -s tests -p test_rust_migration.py -v
@@ -462,7 +478,9 @@ jobs:
           NOTES
           if [[ "$IMPLEMENTATION" == "rust" ]]; then
             echo '' >> release-notes.md
-            echo 'The ZIP includes the standalone Rust desktop and az12-converter.exe CLI. Clean-machine verification is tracked separately.' >> release-notes.md
+            echo 'The ZIP includes the standalone Rust desktop and az12-converter.exe CLI. The desktop requires an OpenGL 2.0 or newer graphics driver. The hosted smoke test uses software OpenGL. Clean-machine verification is tracked separately.' >> release-notes.md
+            echo '' >> release-notes.md
+            echo 'The desktop update adds a model table, a plan preview with zoom controls and a scale bar, and a dedicated DXF export panel. See the [migration benchmark](https://github.com/Ala-Ismail/12daz-App/blob/main/docs/rust_migration_validation.md#conversion-and-repeatability) for the Python and Rust CLI comparison.' >> release-notes.md
           else
             echo '' >> release-notes.md
             echo 'Keep the bundled _internal folder beside the executable.' >> release-notes.md

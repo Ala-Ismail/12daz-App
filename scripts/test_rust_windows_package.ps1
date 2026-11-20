@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory)][string]$Archive,
     [string]$Evidence,
-    [string]$ExpectedPublisher
+    [string]$ExpectedPublisher,
+    [string]$SoftwareOpenGlDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,8 +48,20 @@ try {
     }
 
     $initialPath = $env:Path
+    $initialOpenGl = $env:GLUTIN_WGL_OPENGL_DLL
+    $initialGalliumDriver = $env:GALLIUM_DRIVER
+    $initialSoftwareRendering = $env:LIBGL_ALWAYS_SOFTWARE
     try {
         $env:Path = Join-Path $env:SystemRoot 'System32'
+        if ($SoftwareOpenGlDirectory) {
+            # The hosted runner only exposes OpenGL 1.1. Use Mesa in this temporary extraction.
+            foreach ($dll in @('opengl32.dll', 'libgallium_wgl.dll')) {
+                Copy-Item -LiteralPath (Join-Path $SoftwareOpenGlDirectory $dll) -Destination $folder
+            }
+            $env:GLUTIN_WGL_OPENGL_DLL = Join-Path $folder 'opengl32.dll'
+            $env:GALLIUM_DRIVER = 'llvmpipe'
+            $env:LIBGL_ALWAYS_SOFTWARE = 'true'
+        }
         $cliVersion = & $cli --version
         if ($LASTEXITCODE -ne 0 -or ($cliVersion -join '') -cne "12daz-converter $version") { throw 'Packaged CLI failed its version check' }
         $report = Join-Path $work 'desktop-smoke.json'
@@ -64,7 +77,12 @@ try {
         }
         $smoke = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
         if (-not $smoke.passed -or $smoke.application_version -cne $version) { throw 'Packaged smoke evidence did not match the release' }
-    } finally { $env:Path = $initialPath }
+    } finally {
+        $env:Path = $initialPath
+        $env:GLUTIN_WGL_OPENGL_DLL = $initialOpenGl
+        $env:GALLIUM_DRIVER = $initialGalliumDriver
+        $env:LIBGL_ALWAYS_SOFTWARE = $initialSoftwareRendering
+    }
 
     $result = [ordered]@{
         passed = $true
@@ -74,6 +92,7 @@ try {
         host_os_version = [Environment]::OSVersion.VersionString
         powershell_process_elevated = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         non_system_path_entries_removed = $true
+        software_opengl = [bool]$SoftwareOpenGlDirectory
         smoke = $smoke
     } | ConvertTo-Json -Depth 5
     if ($Evidence) { [IO.File]::WriteAllText([IO.Path]::GetFullPath($Evidence), $result) }

@@ -3,6 +3,7 @@
 mod canvas;
 mod smoke;
 mod state;
+mod theme;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -12,6 +13,7 @@ use eframe::egui::{self, Color32, RichText, Vec2};
 
 use canvas::View;
 use state::{State, output_exists};
+use theme::{AMBER, BLUE, FIELD, GREEN, LINK, MUTED, PANEL, SHELL, TEXT};
 
 const TITLE: &str = "12dAZ Converter";
 const COPYRIGHT: &str = "Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160";
@@ -21,7 +23,6 @@ const LOGO: &[u8] = include_bytes!("../../resources/logo.png");
 const LICENSE: &str = include_str!("../../../LICENSE");
 const UNITS: [&str; 4] = ["metres", "millimetres", "feet", "inches"];
 const ENCODINGS: [&str; 4] = ["cp1252", "utf-8", "utf-16-le", "utf-16-be"];
-const BLUE: Color32 = Color32::from_rgb(35, 102, 188);
 
 #[derive(Clone, Copy)]
 enum Dialog {
@@ -41,17 +42,19 @@ struct Desktop {
     splash_focused: bool,
     closing: bool,
     notices: String,
+    logo: Option<egui::TextureHandle>,
 }
 
 impl Desktop {
     fn new(ctx: &egui::Context, splash: bool) -> Self {
-        let mut visuals = egui::Visuals::dark();
-        visuals.panel_fill = Color32::from_rgb(38, 41, 46);
-        visuals.window_fill = Color32::from_rgb(43, 46, 52);
-        visuals.selection.bg_fill = BLUE;
-        visuals.widgets.active.bg_fill = BLUE;
-        ctx.set_theme(egui::Theme::Dark);
-        ctx.set_visuals_of(egui::Theme::Dark, visuals);
+        theme::install(ctx);
+        let logo = eframe::icon_data::from_png_bytes(LOGO).ok().map(|icon| {
+            let pixels = egui::ColorImage::from_rgba_unmultiplied(
+                [icon.width as usize, icon.height as usize],
+                &icon.rgba,
+            );
+            ctx.load_texture("12daz logo", pixels, egui::TextureOptions::LINEAR)
+        });
         Self {
             state: State::default(),
             view: View::default(),
@@ -60,6 +63,7 @@ impl Desktop {
             splash_focused: false,
             closing: false,
             notices: license_notices(),
+            logo,
         }
     }
 
@@ -134,13 +138,17 @@ impl Desktop {
                 }
             });
         });
-        ui.separator();
         ui.horizontal(|ui| {
-            ui.heading(TITLE);
+            if let Some(logo) = &self.logo {
+                ui.image((logo.id(), Vec2::splat(27.0)));
+            }
+            ui.label(RichText::new(TITLE).size(22.0).strong().color(TEXT));
+            ui.separator();
             if ui
                 .add_enabled(
                     self.state.can_open(),
-                    egui::Button::new("Open archive…").fill(BLUE),
+                    egui::Button::new(RichText::new("Open archive…").strong())
+                        .min_size(Vec2::new(120.0, 31.0)),
                 )
                 .clicked()
             {
@@ -152,20 +160,27 @@ impl Desktop {
                 .as_deref()
                 .and_then(Path::file_name)
                 .map(|name| name.to_string_lossy());
-            ui.label(
-                filename
-                    .as_deref()
-                    .unwrap_or("Open a local .12daz or .12da file to begin"),
-            );
+            let caption = filename
+                .as_deref()
+                .unwrap_or("Choose a local .12daz or .12da file");
+            theme::field().show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                let response =
+                    ui.add(egui::Label::new(RichText::new(caption).color(MUTED)).truncate());
+                if let Some(path) = self.state.input.as_deref() {
+                    response.on_hover_text(path.display().to_string());
+                }
+            });
         });
     }
 
     fn models(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Models");
+        theme::heading(ui, "Models");
+        ui.separator();
         ui.add_enabled(
             self.state.scan.is_some(),
             egui::TextEdit::singleline(&mut self.state.search)
-                .hint_text("Search models")
+                .hint_text("Search models…")
                 .desired_width(f32::INFINITY),
         );
         ui.add_enabled_ui(self.state.can_select(), |ui| {
@@ -178,38 +193,126 @@ impl Desktop {
                 }
             });
         });
-        ui.separator();
         let mut toggled = None;
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                let enabled = self.state.can_select();
-                for model in self.state.visible_models() {
-                    let mut checked = self.state.selected.contains(&model.name);
-                    let row = ui.add_enabled(
-                        enabled && model.convertible > 0,
-                        egui::Checkbox::new(
-                            &mut checked,
-                            format!("{}  ({})", model.name, model.count),
-                        ),
-                    );
-                    if row.changed() {
-                        toggled = Some(model.name.clone());
+        let selected_objects: usize = self
+            .state
+            .scan
+            .iter()
+            .flat_map(|report| &report.models)
+            .filter(|model| self.state.selected.contains(&model.name))
+            .map(|model| model.count)
+            .sum();
+        theme::field().inner_margin(0).show(ui, |ui| {
+            egui::Frame::new()
+                .fill(PANEL)
+                .inner_margin(egui::Margin::symmetric(9, 5))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Model").strong().color(TEXT));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(RichText::new("Items").strong().color(TEXT));
+                        });
+                    });
+                });
+            egui::ScrollArea::vertical()
+                .max_height((ui.available_height() - 25.0).max(30.0))
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    let enabled = self.state.can_select();
+                    for (index, model) in self.state.visible_models().enumerate() {
+                        let mut checked = self.state.selected.contains(&model.name);
+                        let fill = if index % 2 == 0 {
+                            FIELD
+                        } else {
+                            Color32::from_rgb(33, 41, 54)
+                        };
+                        egui::Frame::new()
+                            .fill(fill)
+                            .inner_margin(egui::Margin::symmetric(8, 2))
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    let width = (ui.available_width() - 48.0).max(60.0);
+                                    let row = ui
+                                        .add_enabled_ui(enabled && model.convertible > 0, |ui| {
+                                            if checked {
+                                                ui.visuals_mut().widgets.inactive.bg_fill = BLUE;
+                                            }
+                                            ui.style_mut().wrap_mode =
+                                                Some(egui::TextWrapMode::Truncate);
+                                            ui.allocate_ui_with_layout(
+                                                Vec2::new(width, 25.0),
+                                                egui::Layout::left_to_right(egui::Align::Center),
+                                                |ui| {
+                                                    ui.checkbox(
+                                                        &mut checked,
+                                                        RichText::new(&model.name).color(TEXT),
+                                                    )
+                                                },
+                                            )
+                                            .inner
+                                        })
+                                        .inner;
+                                    if row.changed() {
+                                        toggled = Some(model.name.clone());
+                                    }
+                                    let row = row.on_hover_text(&model.name);
+                                    if model.convertible == 0 {
+                                        row.on_disabled_hover_text("No supported geometry");
+                                    }
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            ui.label(
+                                                RichText::new(model.count.to_string()).color(MUTED),
+                                            );
+                                        },
+                                    );
+                                });
+                            });
                     }
-                }
-            });
+                    if self.state.scan.is_none() {
+                        ui.label(
+                            RichText::new("Open an archive to list models")
+                                .small()
+                                .color(MUTED),
+                        );
+                    }
+                });
+        });
+        if self.state.scan.is_some() {
+            ui.label(
+                RichText::new(format!("{selected_objects} source objects selected"))
+                    .small()
+                    .color(MUTED),
+            );
+        }
         if let Some(model) = toggled {
             self.state.toggle(&model);
         }
     }
 
     fn settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Export settings");
-        ui.add_space(8.0);
+        theme::heading(ui, "DXF export");
+        ui.separator();
         egui::ScrollArea::vertical()
-            .auto_shrink([false, true])
+            .max_height((ui.available_height() - 54.0).max(45.0))
+            .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.add_enabled_ui(!self.state.busy(), |ui| {
+                    for (label, value) in [("DXF version", "DXF 2018"), ("Layers", "One per model")]
+                    {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(label).color(MUTED));
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(RichText::new(value).strong().color(TEXT));
+                                },
+                            );
+                        });
+                    }
+                    ui.separator();
                     ui.label("Geometry");
                     let before = self.state.keep_z;
                     egui::ComboBox::from_id_salt("geometry")
@@ -247,7 +350,6 @@ impl Desktop {
                             self.state.settings_changed();
                         }
                     }
-                    ui.add_space(8.0);
                     ui.label("Drawing units");
                     let before = self.state.units;
                     egui::ComboBox::from_id_salt("units")
@@ -261,21 +363,38 @@ impl Desktop {
                     if before != self.state.units {
                         self.state.settings_changed();
                     }
-                    ui.add_space(8.0);
-                    ui.label("Output DXF");
-                    if ui
-                        .add(
+                    theme::field().show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        ui.label(
+                            RichText::new(if self.state.keep_z {
+                                "Retain supported elevations"
+                            } else {
+                                "Plan view · Z = 0"
+                            })
+                            .color(LINK),
+                        );
+                    });
+                    ui.separator();
+                    ui.label(RichText::new("Output file").strong().color(TEXT));
+                    ui.horizontal(|ui| {
+                        let width = (ui.available_width() - 69.0).max(70.0);
+                        let response = ui.add(
                             egui::TextEdit::singleline(&mut self.state.output)
-                                .desired_width(f32::INFINITY),
-                        )
-                        .changed()
-                    {
-                        self.state.settings_changed();
-                    }
-                    if ui.button("Browse…").clicked() {
-                        self.choose_output();
-                    }
-                    ui.add_space(8.0);
+                                .hint_text("Choose a DXF file…")
+                                .desired_width(width),
+                        );
+                        if response.changed() {
+                            self.state.settings_changed();
+                        }
+                        response.on_hover_text(&self.state.output);
+                        if ui
+                            .button("Browse")
+                            .on_hover_text("Browse for the output DXF")
+                            .clicked()
+                        {
+                            self.choose_output();
+                        }
+                    });
                     ui.collapsing("Input options", |ui| {
                         ui.label("Fallback encoding");
                         let previous = self.state.encoding;
@@ -303,13 +422,18 @@ impl Desktop {
                     });
                 });
             });
-        ui.add_space(8.0);
+        ui.separator();
         if ui
             .add_enabled(
                 self.state.can_export(),
-                egui::Button::new(RichText::new("Export DXF").strong())
-                    .fill(BLUE)
-                    .min_size(Vec2::new(ui.available_width(), 32.0)),
+                egui::Button::new(
+                    RichText::new("Export DXF")
+                        .size(15.0)
+                        .strong()
+                        .color(Color32::WHITE),
+                )
+                .fill(BLUE)
+                .min_size(Vec2::new(ui.available_width(), 36.0)),
             )
             .clicked()
         {
@@ -319,29 +443,40 @@ impl Desktop {
 
     fn preview(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.heading("Plan preview");
-            if ui.button("Fit").clicked() {
-                self.state.fit_pending = true;
-            }
-            egui::ComboBox::from_id_salt("zoom")
-                .selected_text(format!("{}%", self.view.zoom_percent()))
-                .show_ui(ui, |ui| {
-                    for percent in [25, 50, 75, 100, 125, 150, 200, 400] {
-                        if ui
-                            .selectable_label(
-                                self.view.zoom_percent() == percent,
-                                format!("{percent}%"),
-                            )
-                            .clicked()
-                        {
-                            self.view.set_zoom_percent(percent);
+            theme::heading(ui, "Plan preview");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                egui::ComboBox::from_id_salt("zoom")
+                    .width(55.0)
+                    .selected_text(format!("{}%", self.view.zoom_percent()))
+                    .show_ui(ui, |ui| {
+                        for percent in [25, 50, 75, 100, 125, 150, 200, 400] {
+                            if ui
+                                .selectable_label(
+                                    self.view.zoom_percent() == percent,
+                                    format!("{percent}%"),
+                                )
+                                .clicked()
+                            {
+                                self.view.set_zoom_percent(percent);
+                            }
                         }
-                    }
-                });
-            if let Some([x, y]) = self.view.cursor {
-                ui.monospace(format!("X {x:.3}   Y {y:.3}"));
-            }
+                    });
+                if ui.button("−").on_hover_text("Zoom out").clicked() {
+                    self.view.zoom_step(false);
+                }
+                if ui.button("+").on_hover_text("Zoom in").clicked() {
+                    self.view.zoom_step(true);
+                }
+                if ui
+                    .button("Fit")
+                    .on_hover_text("Fit selected models to the preview")
+                    .clicked()
+                {
+                    self.state.fit_pending = true;
+                }
+            });
         });
+        ui.separator();
         if self.state.preview_simplified {
             let dropped = self.state.preview_omitted.len();
             if dropped > 0 {
@@ -362,41 +497,124 @@ impl Desktop {
             std::mem::take(&mut self.state.fit_pending),
             self.state.units,
         );
+        ui.horizontal(|ui| {
+            let coordinates = self.view.cursor.map_or_else(
+                || "Drag to pan · scroll to zoom".into(),
+                |[x, y]| format!("X {x:.3}    Y {y:.3}"),
+            );
+            ui.add(egui::Label::new(RichText::new(coordinates).small().color(MUTED)).truncate());
+        });
     }
 
     fn status(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal_wrapped(|ui| {
-            if self.state.waiting() {
-                ui.spinner();
-            }
-            ui.label(&self.state.status);
-            if self.state.scan.is_some() {
-                ui.label(format!("{} models selected", self.state.selected.len()));
-            }
-            if self.state.waiting()
-                && ui
-                    .add_enabled(
-                        !self.state.cancellation_requested(),
-                        egui::Button::new("Cancel"),
-                    )
-                    .clicked()
-            {
-                self.state.cancel();
-            }
-            if let Some(report) = self.state.report() {
-                if ui
-                    .button(format!("Report · {} warnings", report.diagnostics.total))
-                    .clicked()
-                {
-                    self.dialog = Some(Dialog::Report);
-                }
-                if let Some(path) = report.output.as_deref().and_then(Path::parent)
-                    && ui.button("Open output folder").clicked()
-                    && let Err(error) = open_folder(path)
-                {
-                    self.state.status = format!("Cannot open output folder · {error}");
-                }
-            }
+        theme::panel()
+            .outer_margin(egui::Margin::symmetric(4, 2))
+            .inner_margin(egui::Margin::symmetric(10, 5))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let report = self.state.report();
+                    let warnings = report.map_or(0, |report| report.diagnostics.total);
+                    let output_folder = report
+                        .and_then(|report| report.output.as_deref())
+                        .and_then(Path::parent)
+                        .map(Path::to_owned);
+                    let report_enabled = report.is_some();
+                    let waiting = self.state.waiting();
+                    let failed = self.state.status.starts_with("Failed")
+                        || self.state.status.starts_with("Cannot");
+                    let complete = self.state.result.is_some();
+                    let ready = self.state.can_export();
+                    let (label, accent) =
+                        if waiting || failed || self.state.status.contains("Cancelled") {
+                            (
+                                self.state.status.as_str(),
+                                if failed { AMBER } else { LINK },
+                            )
+                        } else if complete {
+                            ("DXF exported", GREEN)
+                        } else if ready {
+                            ("Ready to export", GREEN)
+                        } else if self.state.scan.is_some() && self.state.units.is_none() {
+                            ("Choose drawing units", LINK)
+                        } else {
+                            (self.state.status.as_str(), MUTED)
+                        };
+                    if waiting {
+                        ui.spinner();
+                    } else {
+                        let (dot, _) =
+                            ui.allocate_exact_size(Vec2::splat(10.0), egui::Sense::hover());
+                        ui.painter().circle_filled(dot.center(), 3.5, accent);
+                    }
+                    let status = ui
+                        .allocate_ui_with_layout(
+                            Vec2::new(205.0, 21.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.add(
+                                    egui::Label::new(RichText::new(label).strong().color(TEXT))
+                                        .truncate(),
+                                )
+                            },
+                        )
+                        .inner;
+                    status.on_hover_text(&self.state.status);
+                    if self.state.scan.is_some() {
+                        ui.separator();
+                        ui.label(
+                            RichText::new(format!("{} models selected", self.state.selected.len()))
+                                .color(MUTED),
+                        );
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if waiting
+                            && ui
+                                .add_enabled(
+                                    !self.state.cancellation_requested(),
+                                    egui::Button::new("Cancel"),
+                                )
+                                .clicked()
+                        {
+                            self.state.cancel();
+                        }
+                        if ui
+                            .add_enabled(
+                                report_enabled,
+                                egui::Button::new(RichText::new("View report").color(LINK)),
+                            )
+                            .clicked()
+                        {
+                            self.dialog = Some(Dialog::Report);
+                        }
+                        if warnings > 0 {
+                            ui.label(
+                                RichText::new(format!(
+                                    "{} warning{}",
+                                    warnings,
+                                    if warnings == 1 { "" } else { "s" }
+                                ))
+                                .strong()
+                                .color(AMBER),
+                            );
+                        }
+                        if let Some(path) = output_folder
+                            && ui.button("Output folder").clicked()
+                            && let Err(error) = open_folder(&path)
+                        {
+                            self.state.status = format!("Cannot open output folder · {error}");
+                        }
+                    });
+                });
+            });
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new("Local files · Offline conversion")
+                    .small()
+                    .color(MUTED),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(RichText::new(format!("v{VERSION}")).small().color(MUTED));
+            });
         });
     }
 
@@ -508,19 +726,34 @@ impl Desktop {
                 self.dialog = Some(Dialog::HelpMenu);
             }
         }
-        egui::Panel::top("app-menu").show(ui, |ui| self.menu(ui));
-        egui::Panel::bottom("app-status").show(ui, |ui| self.status(ui));
+        let chrome = egui::Frame::new()
+            .fill(SHELL)
+            .inner_margin(egui::Margin::symmetric(6, 4));
+        egui::Panel::top("app-menu")
+            .frame(chrome)
+            .show_separator_line(false)
+            .show(ui, |ui| self.menu(ui));
+        egui::Panel::bottom("app-status")
+            .frame(chrome)
+            .show_separator_line(false)
+            .show(ui, |ui| self.status(ui));
         egui::Panel::left("model-list")
             .resizable(true)
-            .default_size(240.0)
-            .min_size(175.0)
+            .default_size(247.0)
+            .min_size(180.0)
+            .frame(theme::panel())
+            .show_separator_line(false)
             .show(ui, |ui| self.models(ui));
         egui::Panel::right("export-settings")
             .resizable(true)
-            .default_size(250.0)
-            .min_size(205.0)
+            .default_size(264.0)
+            .min_size(218.0)
+            .frame(theme::panel())
+            .show_separator_line(false)
             .show(ui, |ui| self.settings(ui));
-        egui::CentralPanel::default().show(ui, |ui| self.preview(ui));
+        egui::CentralPanel::default()
+            .frame(theme::panel())
+            .show(ui, |ui| self.preview(ui));
         self.show_dialog(&ctx);
         self.splash(&ctx);
     }
