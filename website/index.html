@@ -57,6 +57,7 @@
         <nav aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
+          <a href="#background-maps">Maps</a>
           <a href="#history">History</a>
           <a href="https://github.com/Ala-Ismail/12daz-App"
             >GitHub <span aria-hidden="true">↗</span></a
@@ -303,6 +304,44 @@
               >Read the validation status <span aria-hidden="true">↗</span></a
             >
           </aside>
+        </div>
+      </section>
+
+      <section
+        class="section container geometry-section"
+        id="background-maps"
+        aria-labelledby="background-maps-title"
+      >
+        <div class="section-heading">
+          <h2 id="background-maps-title">Background maps</h2>
+          <p>
+            In the v0.3.0 development preview, place your survey over a street
+            map or satellite imagery. Open View → Background Map and adjust
+            the map opacity to keep your linework easy to read.
+          </p>
+        </div>
+        <div class="geometry-content">
+          <div class="geometry-group">
+            <h3>Choose a basemap</h3>
+            <p>
+              Use OpenStreetMap Streets, Google Satellite with Labels, or Esri
+              World Imagery with Labels. Google and Esri use your own API key.
+              The app can load a key you save in Windows Credential Manager.
+            </p>
+          </div>
+          <div class="geometry-group">
+            <h3>Place your survey</h3>
+            <p>
+              Assign the survey's MGA zone, datum and source units. For a
+              local grid, align one control point for translation or two for
+              scale and rotation. The map is a visual reference and DXF export
+              preserves the source coordinates.
+            </p>
+            <p>
+              Conversion runs offline. When a map is enabled, its provider
+              receives the visible map location.
+            </p>
+          </div>
         </div>
       </section>
 
