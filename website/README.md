@@ -24,7 +24,7 @@ Import `Ala-Ismail/12daz-App` as a new Vercel project with these settings:
 | Output Directory | `.` |
 | Install Command | Override and leave empty |
 
-Deploy and check the resulting preview before attaching a production domain. The website is independent of the Python application and its GitHub Actions build. No Vercel configuration or account credentials are stored here.
+Deploy and check the resulting preview before attaching a production domain. The static site deploys independently of the converter's Windows build and contains no conversion service.
 
 Settings reference: [Vercel build configuration](https://vercel.com/docs/builds/configure-a-build).
 
@@ -36,14 +36,14 @@ The v0.1.3 ZIP and checksum URLs both returned HTTP 200 on 15 November 2026. Hos
 
 ## Updating a download
 
-`index.html` links to the v0.1.5 pre-release, Windows x64 ZIP and checksum on GitHub.
+`index.html` links to the published v0.1.5 pre-release, Windows x64 ZIP and checksum on GitHub. The FAQ and [Rust desktop preview](assets/12daz-converter-rust-0.2.0.png) describe the locally built v0.2.0 candidate. The [migration validation](../docs/rust_migration_validation.md) records the candidate checks.
 
 When publishing a new desktop version:
 
 1. Verify the release and both its Windows ZIP and checksum are public.
 2. Update both download buttons, the release-notes link and checksum link together.
 3. Update the version labels and preview/release status.
-4. Check product claims against `readme.md` and `docs/validation_status.md`.
+4. Check product claims against `readme.md` and the validation document for the release.
 5. If changing the screenshot, copy an actual application screenshot into `assets/`, update image dimensions and alternative text, and label its version and demonstration data accurately.
 
 The support link is <https://paypal.me/12dazapp>, labelled **Buy me coffee** beneath the download panel and in the footer. A closing section above the footer pairs an actual application screenshot with **Would you buy me a cuppa?** and a **Buy me a cuppa** button. Its image, `assets/12daz-coffee-and-muffin-gui.png`, captures the v0.1.5 GUI after opening `outputs/coffee_and_muffin.12da` through the application's normal loading workflow, with all five models selected and units set to millimetres. The original synthetic drawing and generated DXF remain in ignored `outputs/`.

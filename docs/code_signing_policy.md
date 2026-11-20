@@ -4,7 +4,7 @@
 
 ## Current status
 
-The project is preparing for the SignPath Foundation open-source signing programme. A disabled signing workflow and artifact configuration are prepared; application, account/policy configuration and activation remain pending. No application has been submitted through this repository work, and no approval or certificate has been granted. The published v0.1.3 executable is unsigned. Do not treat a checksum as a publisher signature.
+The project is preparing for the SignPath Foundation open-source signing programme. The signing workflow and artifact configuration are prepared, with application, account configuration and activation pending. The published v0.1.5 executable and local Rust v0.2.0 candidate are unsigned. A matching checksum verifies download integrity. Publisher signatures are verified separately.
 
 The Azure signing integration described in [code_signing.md](code_signing.md) is a separate, inactive option; it does not provide SignPath access. Future release notes will identify the signing status of each release.
 

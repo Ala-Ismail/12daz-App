@@ -33,9 +33,18 @@ $payload = Join-Path $work 'payload'
 Expand-Archive -LiteralPath $archive -DestinationPath $payload
 $folder = Join-Path $payload "12dAZ-Converter-$Version"
 $executable = Join-Path $folder '12dAZ-Converter.exe'
-if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or
-    -not (Test-Path -LiteralPath (Join-Path $folder '_internal') -PathType Container)) {
+$pythonLayout = Test-Path -LiteralPath (Join-Path $folder '_internal') -PathType Container
+$rustCli = Join-Path $folder 'az12-converter.exe'
+$rustLayout = (Test-Path -LiteralPath $rustCli -PathType Leaf) -and
+    (Test-Path -LiteralPath (Join-Path $folder 'THIRD_PARTY_NOTICES.txt') -PathType Leaf)
+if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or ($pythonLayout -eq $rustLayout)) {
     throw 'Original package layout is invalid'
+}
+if ($rustLayout) {
+    $cliInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($rustCli)
+    if ($cliInfo.ProductVersion -cne $Version -or $cliInfo.OriginalFilename -cne 'az12-converter.exe') {
+        throw 'Standalone CLI metadata does not match this release'
+    }
 }
 Copy-Item -LiteralPath $signedExe -Destination $executable -Force
 $report = Join-Path $work 'signed-smoke.json'

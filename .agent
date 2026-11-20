@@ -2,28 +2,39 @@
 
 ## Purpose and status
 
-Build an offline standalone Windows x64 converter from 12daz/12da to editable 2D DXF. Version 0.1.3 implements scanning, supported 2D DXF conversion and a desktop GUI. See docs/validation_status.md for measured evidence and pending release checks. Do not describe unverified cases as passed.
+Maintain the offline Windows x64 12daz/12da to DXF 2018 converter. The Rust candidate is v0.2.0. The published Windows release is v0.1.5. Use docs/rust_migration_validation.md for actual test evidence. RUST-17 is disabled for this migration run at the maintainer's request and is tracked separately for clean-machine verification.
 
 ## Source of truth
 
 - readme.md: overview and current status.
-- 12daz_design.md: architecture and conversion behaviour.
-- docs/test_requirements.md: test requirements, cases and release gates.
-- docs/implementation_steps.md: ordered implementation tasks and completion criteria.
-- docs/validation_status.md: current evidence and remaining qualification.
-- docs/assets/12daz-converter-gui-proposal.png: visual proposal, not running software.
+- rust/Cargo.toml defines the active application version, dependencies, and Windows desktop feature.
+- rust/src contains the Rust archive reader, parser, geometry routines, preview, DXF backend and conversion service. rust/src/main.rs is the CLI and rust/src/desktop is the native GUI.
+- 12daz_design.md describes the archive and conversion behaviour. docs/test_requirements.md defines the product requirements.
+- docs/rust_migration_plan.md, docs/rust_migration_test_requirements.md, and docs/rust_migration_validation.md record the migration and its qualification.
+- src/az12_converter and docs/rust_migration_baseline.md preserve the historical Python reference for parity tests and earlier release tags.
+- website/ contains the product pages and public download links.
 
 ## Agreed scope
 
-Use Python, Tk/ttk and ezdxf for the initial implementation. Tk replaces the proposed PySide6 toolkit; keep conversion independent of the UI. Package the runtime so end users do not need Python, AutoCAD or 12d Model. DXF 2018 is the initial output. DWG is future work. Preserve full survey XY coordinates and flatten geometry to Z=0. Unit declaration must not silently rescale coordinates. Report unsupported content and approximations.
+Implement future features and enhancements in Rust only. Keep `src/az12_converter` as the historical Python parity reference. Add tests for new behaviour to the Rust suite.
+
+Use Rust for the converter, eframe/egui for the desktop, and acadrust for DXF 2018. Keep conversion independent of the GUI. Export full survey XY and use zero elevation in Flatten 2D. Keep Z requires verified source elevations. Preserve coordinates when declaring drawing units. Report unsupported objects, approximations and substitutions. DWG and drainage Keep Z remain outside the current supported scope.
 
 ## Implementation guidance
 
-Separate archive reading, grammar parsing, geometry conversion, DXF writing and GUI code. Parse documented grammar and validate against real fixtures. Stream archive input, bound resource usage, and keep the UI responsive through a worker process. Never substitute mockup counts or geometry for parsed data. Publish validated output atomically and protect input and existing destination files on failure or cancellation.
+Keep archive reading, grammar parsing, geometry, preview, DXF and desktop code in their existing modules. Stream input within configured limits and run jobs through the shared conversion service. The desktop worker uses revision checks so stale previews cannot replace the current selection. Validate the temporary DXF before atomic publication and protect the source and existing destinations on failure or cancellation.
 
 ## Testing and reporting
 
-Use the case IDs and acceptance criteria in docs/test_requirements.md. Add meaningful tests alongside implemented behaviour; do not create passing placeholders for missing features. Run relevant checks for each change and report what actually ran. Keep independent CAD interoperability and clean-machine packaging checks as release requirements. Record benchmark hardware, total process-tree memory and elapsed time before making performance claims.
+Use the case IDs in docs/test_requirements.md and docs/rust_migration_test_requirements.md. Run these commands from the repository root on Windows.
+
+```powershell
+cargo test --manifest-path rust/Cargo.toml --locked --features desktop
+.\scripts\build_rust_windows.ps1
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.2.0-Windows-x64.zip
+```
+
+Use Python 3.11 with the pinned ezdxf version for the independent audit and parity tests. Set `RUST_MIGRATION_CLI` to the built CLI and run `python -m unittest discover -s tests -p test_rust_migration.py -v`. Record executed results, CAD interoperability, package evidence and benchmark hardware. Use .github/workflows/test.yml for Windows release builds and docs/github_release.md for tagging and signing steps. Change public version and download links after verifying the corresponding release assets.
 
 ## Repository hygiene
 

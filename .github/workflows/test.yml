@@ -45,6 +45,7 @@ jobs:
       release_tag: ${{ steps.package.outputs.release_tag }}
       signpath_artifact_id: ${{ steps.signpath-input.outputs.artifact-id }}
       source_commit: ${{ steps.package.outputs.source_commit }}
+      implementation: ${{ steps.package.outputs.implementation }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,27 +75,65 @@ jobs:
           @'
           import os, re, runpy, tomllib
           from pathlib import Path
-          version = runpy.run_path('src/az12_converter/__init__.py')['__version__']
+          rust_manifest = Path('rust/Cargo.toml')
+          implementation = 'rust' if rust_manifest.is_file() else 'python'
+          if implementation == 'rust':
+              version = tomllib.loads(rust_manifest.read_text(encoding='utf-8'))['package']['version']
+          else:
+              version = runpy.run_path('src/az12_converter/__init__.py')['__version__']
+              project = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8-sig'))
+              if project['project']['version'] != version:
+                  raise SystemExit('pyproject.toml and application versions disagree')
           if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
               raise SystemExit('Expected numeric major.minor.patch version')
-          project = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8-sig'))
-          if project['project']['version'] != version:
-              raise SystemExit('pyproject.toml and application versions disagree')
           tag = os.environ.get('RELEASE_TAG', '')
           if tag and tag != f'v{version}':
               raise SystemExit(f'Tag {tag!r} must match application version v{version}')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write(f'version={version}\npackage_name=12dAZ-Converter-{version}-Windows-x64\nrelease_tag={tag}\n')
+              output.write(f'version={version}\npackage_name=12dAZ-Converter-{version}-Windows-x64\nrelease_tag={tag}\nimplementation={implementation}\n')
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw 'Version validation failed' }
           "source_commit=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
       - name: Install pinned build dependencies
+        if: steps.package.outputs.implementation == 'python'
         run: python -m pip install -r requirements-build.txt
-      - name: Run automated tests
+      - name: Run historical Python tests
+        if: steps.package.outputs.implementation == 'python'
         run: python scripts/test.py
-      - name: Build portable Windows package
+      - name: Build historical Python package
+        if: steps.package.outputs.implementation == 'python'
         run: python scripts/build.py
+      - name: Install Rust and the Python audit reader
+        if: steps.package.outputs.implementation == 'rust'
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default 1.99.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install -r requirements.lock
+      - name: Run Rust core and desktop tests
+        if: steps.package.outputs.implementation == 'rust'
+        run: cargo test --manifest-path rust/Cargo.toml --locked --features desktop
+      - name: Build and test Rust portable package
+        if: steps.package.outputs.implementation == 'rust'
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
+        run: |
+          $null = New-Item -ItemType Directory -Force -Path outputs
+          ./scripts/build_rust_windows.ps1 -OutputDirectory dist
+          $archive = "dist/$env:PACKAGE_NAME.zip"
+          ./scripts/test_rust_windows_package.ps1 -Archive $archive -Evidence outputs/rust-package-smoke.json
+          Expand-Archive -LiteralPath $archive -DestinationPath dist
+          $env:RUST_MIGRATION_CLI = (Resolve-Path rust/target/x86_64-pc-windows-msvc/release/az12-converter.exe).Path
+          python -m unittest discover -s tests -p test_rust_migration.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo run --manifest-path rust/Cargo.toml --locked --example dxf_probe -- outputs/rust-dxf-probe.dxf
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/audit_rust_dxf_probe.py outputs/rust-dxf-probe.dxf
       - name: Verify packaged application
+        if: steps.package.outputs.implementation == 'python'
         shell: pwsh
         env:
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
@@ -111,6 +150,7 @@ jobs:
             throw 'Packaged smoke result failed or reported the wrong version'
           }
       - name: Create package checksum
+        if: steps.package.outputs.implementation == 'python'
         shell: pwsh
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.package_name }}
@@ -134,6 +174,7 @@ jobs:
           name: windows-build-diagnostics-${{ github.run_id }}
           path: |
             outputs/packaged-smoke.json
+            outputs/rust-package-smoke.json
             build/12daz-converter/warn-12daz-converter.txt
           if-no-files-found: ignore
 
@@ -399,6 +440,7 @@ jobs:
           PUBLISH_RELEASE: ${{ inputs.publish_release && 'true' || 'false' }}
           SIGNED_PACKAGE: ${{ (needs.sign.result == 'success' || needs.signpath.result == 'success') && 'true' || 'false' }}
           SIGNPATH_PACKAGE: ${{ needs.signpath.result == 'success' && 'true' || 'false' }}
+          IMPLEMENTATION: ${{ needs.windows.outputs.implementation }}
         run: |
           set -euo pipefail
           asset="package/$PACKAGE_NAME.zip"
@@ -406,18 +448,26 @@ jobs:
           cat > release-notes.md <<'NOTES'
           Free, MIT-licensed Windows converter from 12daz / 12da to editable DXF 2018.
 
-          Extract the complete Windows ZIP and run 12dAZ-Converter.exe. Keep the _internal folder beside it. Python, AutoCAD and 12d Model are not required on the user's computer.
+          Extract the complete Windows ZIP and run 12dAZ-Converter.exe. Python, AutoCAD and 12d Model are not required on the user's computer.
 
           - **Flatten 2D** exports supported plan geometry, including verified drainage pipe spans. **Keep Z** preserves known elevations and supports solved alignment grades and symmetric parabolic profiles.
           - **Assume linear grade on arcs** lets Keep Z sample circular strings with varying elevations to the selected plan tolerance. The conversion report records the grade assumption.
           - Dense previews prioritize bends, closed outlines and spatial coverage within the shared 30,000-point budget. The title row includes the open button and filename.
 
-          This is a preview build. Unsupported objects, omitted metadata/labels and style substitutions are reported. Independent CAD and clean-machine release qualification remain pending. Review conversion reports before using exported drawings.
+          This is a preview build. Unsupported objects, omitted metadata/labels and style substitutions are reported. Review conversion reports before using exported drawings.
 
           The package passed automated tests and the packaged application smoke test in GitHub Actions. SHA256SUMS.txt contains its checksum.
 
           [Code signing policy](https://github.com/Ala-Ismail/12daz-App/blob/main/docs/code_signing_policy.md).
           NOTES
+          if [[ "$IMPLEMENTATION" == "rust" ]]; then
+            echo '' >> release-notes.md
+            echo 'The ZIP includes the standalone Rust desktop and az12-converter.exe CLI. Clean-machine verification is tracked separately.' >> release-notes.md
+          else
+            echo '' >> release-notes.md
+            echo 'Keep the bundled _internal folder beside the executable.' >> release-notes.md
+            echo 'Independent CAD and clean-machine qualification remain pending for this historical build.' >> release-notes.md
+          fi
           if [[ "$SIGNED_PACKAGE" == "true" ]]; then
             echo '' >> release-notes.md
             echo 'The application executable has a verified, timestamped publisher signature. New releases can still receive Microsoft Defender SmartScreen reputation warnings.' >> release-notes.md

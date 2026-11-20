@@ -19,6 +19,7 @@ venv/
 __pypackages__/
 
 # Build and packaging output
+target/
 build/
 dist/
 *.exe

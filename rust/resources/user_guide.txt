@@ -1,0 +1,27 @@
+12dAZ Converter — User Guide
+
+1. Open an archive
+Choose File > Open archive, Ctrl+O, or Open archive in the title row. Select a ZIP .12daz containing one .12da payload, or a plain .12da file. Input stays on this computer. Automatic decoding honours Unicode BOMs and otherwise uses strict UTF-8. For older files, open Input options and choose a fallback encoding.
+
+2. Select models
+The converter initially selects models with convertible geometry. Click a checkbox or focus it and press Space. Search filters the displayed rows and preserves hidden selections. Select all checks every convertible model. Use Report to see the full inventory and diagnostics.
+
+3. Inspect the plan preview
+Drag to pan, scroll to zoom, or choose a zoom percentage. Fit resets the extent to the selected models. The preview shares at most 30,000 display points across the selection. Selecting models refreshes the preview in the background. DXF export uses independent, full geometry.
+
+4. Choose geometry and units
+Flatten 2D exports supported plan geometry at zero elevation. Keep Z retains verified elevations. Set positive plan and elevation tolerances for supported curve sampling. For arcs with differing endpoint elevations, enable Assume linear grade on arcs only if that assumption suits the source data. Select metres, millimetres, feet, or inches. Unit declaration leaves coordinates unchanged.
+
+5. Export DXF
+Choose a DXF destination and select Export DXF. Confirm before replacing existing output. Cancel stops the job at a safe checkpoint. The converter validates the temporary drawing before publishing it. Publication can complete before a late cancellation arrives.
+
+6. Review the results
+Report shows selected and skipped objects, emitted entities, warnings, and layer mappings. The application writes a .dxf.conversion.json report beside the drawing. Open output folder locates it. Unsupported geometry, omitted attributes, and appearance substitutions are reported. A report write failure leaves a successfully published DXF available.
+
+Supported geometry
+Points, supported straight and circular strings, closed outlines, circles and arcs, single-line world-size text, supported solved and reconstructed alignments, and verified drainage plan spans in Flatten 2D. Keep Z can sample supported profiles and selected elevated arcs. The converter omits unsupported civil semantics, symbols, meshes and source labels. Drainage Keep Z requires verified source elevations and is unavailable. The output is DXF 2018.
+
+About and support
+Help shows the installed version, license, and third-party notices offline. The brief splash closes automatically or with Continue, Enter or Escape. The optional PayPal link opens an external page only when selected.
+
+Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160

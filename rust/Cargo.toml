@@ -1,0 +1,38 @@
+[package]
+name = "az12-converter"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+publish = false
+default-run = "az12-converter"
+
+[features]
+desktop = ["dep:eframe", "dep:rfd"]
+
+[[bin]]
+name = "12dAZ-Converter"
+path = "src/desktop/main.rs"
+required-features = ["desktop"]
+
+[dependencies]
+acadrust = "=0.6.4"
+clap = { version = "4.5", features = ["derive"] }
+ctrlc = "3.5"
+eframe = { version = "=0.36.2", default-features = false, features = ["accesskit", "default_fonts", "glow", "links"], optional = true }
+encoding_rs = "=0.8.44"
+regex = "1.12"
+rfd = { version = "=0.17.2", optional = true }
+same-file = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.27"
+unicode-casefold = "0.2"
+uuid = { version = "1.27", features = ["v4"] }
+zip = { version = "=3.0.0", default-features = false, features = ["bzip2", "deflate-flate2-zlib-rs", "lzma"] }
+
+[build-dependencies]
+embed-resource = "3.0"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }

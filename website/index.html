@@ -204,7 +204,8 @@
               <h3>Download &amp; extract</h3>
               <p>
                 Download the Windows ZIP and extract the whole archive. Keep the
-                <code>_internal</code> folder beside the executable.
+                extracted files together. The v0.1.5 ZIP includes an
+                <code>_internal</code> folder.
               </p>
             </li>
             <li>
@@ -391,8 +392,19 @@
           <details>
             <summary>Do I need Python, AutoCAD or 12d Model?</summary>
             <p>
-              No. The packaged Windows application includes its runtime and does
-              not require those applications to convert supported geometry.
+              No. The Windows download runs on its own and converts supported
+              geometry locally.
+            </p>
+          </details>
+          <details>
+            <summary>What is the Rust v0.2.0 candidate?</summary>
+            <p>
+              The project source now includes a Rust desktop converter and a
+              separate command-line executable. The candidate passed local DXF
+              and Windows package checks. Clean-machine verification is tracked
+              separately. The public download on this page is v0.1.5.
+              <a href="https://github.com/Ala-Ismail/12daz-App">View the project source</a>
+              or <a href="assets/12daz-converter-rust-0.2.0.png">see the Rust desktop preview</a>.
             </p>
           </details>
           <details>

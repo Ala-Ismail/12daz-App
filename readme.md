@@ -2,49 +2,50 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-The latest release is [**v0.1.5**](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.5), a Windows pre-release. Independent CAD comparison and clean-machine release qualification remain pending. Review the conversion report for unsupported geometry, omitted labels and metadata, and style substitutions. DWG remains future work.
+The current source builds the **v0.2.0 Rust candidate** with a Windows desktop app and command-line converter. The published Windows download is [**v0.1.5**](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.5). The Rust candidate passed local package and AutoCAD checks. Clean-machine verification is tracked separately. [Rust validation results](docs/rust_migration_validation.md)
 
-![12dAZ Converter v0.1.5 desktop interface](website/assets/12daz-converter-gui.png)
+![12dAZ Converter Rust v0.2.0 candidate showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
 
 *Screenshot uses synthetic demonstration data.*
 
 ## Code signing status and Windows warning
 
-We are working toward trusted code signing for 12dAZ Converter and exploring the SignPath Foundation open-source programme. Signing is not yet approved or active, and the current **v0.1.5 Windows executable is unsigned**. In the meantime, Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning such as: **“Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.”**
+The published v0.1.5 Windows executable and the local v0.2.0 candidate are unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
 
-Download only from the project's [official GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases) and verify the ZIP against its published `SHA256SUMS.txt`. A matching checksum verifies download integrity; it does not replace a publisher signature or establish that a program is safe. See the [Code signing policy](docs/code_signing_policy.md) for current status and release responsibilities.
+Use the project's official releases for published downloads. Verify the ZIP against its published `SHA256SUMS.txt` to check download integrity. [GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases)
 
 ## Run the Windows application
 
-The local build is `dist/12dAZ-Converter-0.1.5/12dAZ-Converter.exe`. Distribute the complete `dist/12dAZ-Converter-0.1.5-Windows-x64.zip`; extract the whole archive and run the executable inside its folder. Keep its `_internal` folder beside it. End users do not need Python.
+Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extracted folder. Keep the files in that folder together. The Rust package includes `az12-converter.exe` for command-line use. The published v0.1.5 ZIP includes an `_internal` folder as part of its bundle.
 
 1. Open a `.12daz` or `.12da` file.
-2. Review models and preview; select the models to export.
+2. Review the preview and select the models to export.
 3. Choose drawing units, **Flatten 2D** or **Keep Z** under **Geometry**, and a `.dxf` destination. Declaring units does not rescale coordinates. The preview shows the source plan in either mode.
-4. Select **Export DXF** and review warnings in **View report**. A `.dxf.conversion.json` report is saved beside the drawing.
+4. Select **Export DXF** and review warnings in **Report**. A `.dxf.conversion.json` report is saved beside the drawing.
 
-**Help** provides an offline User Guide, About dialog, MIT license and dependency notices. A brief startup splash includes optional support through PayPal; it closes automatically after about 1.8 seconds, or immediately with Continue, Enter or Escape. Help > About contains the same support link. Cancel requests safe cleanup before output publication.
+**Help** provides the offline User Guide, About, license, and dependency notices. Cancel requests safe cleanup before output publication.
 
 ## Run from source
 
-Use Python 3.11 or later with Tcl/Tk available. Install the pinned DXF dependency:
+Use the Rust 1.99.1 toolchain with the Windows MSVC build tools and Windows SDK. Run these commands from the repository root.
 
 ```powershell
-python -m pip install -e .
-python run_gui.py
+cargo run --manifest-path rust/Cargo.toml --locked --features desktop --bin 12dAZ-Converter
 ```
 
-The implementation uses **Tk/ttk**, Python's bundled desktop toolkit, and **ezdxf 1.3.5**. Tk replaced the proposed PySide6 dependency because downloads were unavailable in the development environment. Conversion runs in a separate process so the GUI stays responsive. A future Qt UI can reuse the conversion service.
+The desktop uses `eframe`/`egui`. It runs conversion on a background worker using the same Rust service as the CLI. The core uses `acadrust` to write and reopen DXF 2018. Python's `ezdxf` remains an independent audit reader in migration tests.
 
-Command line:
+**Future features and enhancements are Rust-only.** Implement them in `rust/` and add coverage to the Rust test suite. The Python source serves as the historical parity reference and supports builds from earlier release tags.
+
+Run the CLI from the portable folder in PowerShell.
 
 ```powershell
-python run_cli.py inspect "survey.12daz" --report "inspect.json"
-python run_cli.py convert "survey.12daz" --output "survey_2D.dxf" --units metres
-python run_cli.py convert "survey.12daz" --output "survey_3D.dxf" --units metres --geometry-mode keep-z
+.\az12-converter.exe inspect "survey.12daz" --report "inspect.json"
+.\az12-converter.exe convert "survey.12daz" --output "survey_2D.dxf" --units metres
+.\az12-converter.exe convert "survey.12daz" --output "survey_3D.dxf" --units metres --geometry-mode keep-z
 ```
 
-Repeat `--model "Model name"` to select models. Use `--overwrite` to replace existing drawing/report files, `--encoding cp1252` for a legacy no-BOM file, and `--max-expanded-mib` to change the default 1024 MiB expanded-input limit. Exit codes: 0 clean completion, 2 completion with warnings, 1 failure, 3 cancellation. A warning exit code can also indicate omitted attributes or a substituted style despite correct base plan geometry.
+From source, use `cargo run --manifest-path rust/Cargo.toml --locked --bin az12-converter --` followed by the CLI arguments. Repeat `--model "Model name"` to select models. Use `--overwrite` to replace existing drawing and report files, `--encoding cp1252` for a legacy file without a BOM, or `--max-expanded-mib` to change the 1024 MiB limit. Exit codes are `0` for clean completion, `2` for completion with warnings or an argument error, `1` for conversion failure, and `3` for cancellation. Warnings can identify omitted attributes or substituted styles.
 
 ## Supported geometry and limits
 
@@ -59,55 +60,49 @@ For Keep Z, **Plan tolerance** and **Elevation tolerance** each default to **0.0
 
 **4D strings and contours are deferred.** TINs, meshes, symbols, rendered annotations and paper/screen-size text are unsupported. The report identifies skipped objects, omitted alignment labels and drainage attributes, and style substitutions. The GUI preview prioritizes bends, outlines and spatial coverage within a shared 30,000-point allowance. Export uses the selected geometry and tolerances independently of that allowance.
 
-Local sample checks found 91 convertible Keep Z alignments and reopened and audited 103 Flatten 2D pipe spans. See [validation status](docs/validation_status.md).
+The reference survey produced equivalent Python and Rust reports and reopened geometry in both export modes. [Rust validation results](docs/rust_migration_validation.md)
 
 ## Test and build
 
 ```powershell
-python scripts/test.py
-python -m pip install -r requirements.lock
-python scripts/build.py
+cargo test --manifest-path rust/Cargo.toml --locked --features desktop
+.\scripts\build_rust_windows.ps1
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.2.0-Windows-x64.zip
 ```
 
-The test suite uses Python's standard `unittest`, synthetic fixtures and withdrawn Tk windows; no pytest dependency is required. Windows CI runs the suite and creates a ZIP artifact. Build-time license collection fails if required dependency/runtime notices are unavailable.
+The package script writes a ZIP and `SHA256SUMS.txt` to `dist/rust-candidate/`. Use `-OutputDirectory` to build into another folder and `-Offline` after the locked dependencies are cached. The package test verifies the checksum and executable metadata, opens the extracted desktop in smoke-test mode, and checks GUI/CLI parity with synthetic data.
 
-To smoke-test a built executable without showing its main window:
-
-```powershell
-& .\dist\12dAZ-Converter-0.1.5\12dAZ-Converter.exe --smoke-test "$PWD\outputs\packaged-smoke.json"
-```
-
-Create the report's parent directory first. This check runs Tk startup, spawned scanning/export, DXF audit and offline Help/About resources on synthetic data. It does not replace clean-machine qualification.
+The Python source is retained as the historical baseline. Its interpreter and test setup, the parity runner, and the separate clean-machine check are documented here. [Python baseline](docs/rust_migration_baseline.md) · [Migration tests](docs/rust_migration_test_requirements.md) · [Release validation](docs/rust_migration_validation.md)
 
 ## GitHub builds and releases
 
 Push to `main` to build the Windows package in GitHub Actions. Download the ZIP and checksum from the successful run's **Artifacts** section.
 
-Push the updated **Publish release** workflow to `main` to build, verify and publish the configured version as a GitHub pre-release. To publish an existing tag manually, run **Actions > Publish release > Run workflow** and enter that tag. Existing published releases are preserved.
-
-See [GitHub build and release steps](docs/github_release.md) for details.
+The release workflow uses the Rust manifest where present and uses the Python build for earlier tags. For a new release, tag the reviewed source with the version in `rust/Cargo.toml` and follow the release workflow. [GitHub build and release steps](docs/github_release.md)
 
 ## Project documents
 
 - [Design and original GUI concept](12daz_design.md).
-- [Current GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
+- [Published v0.1.5 GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
 - [Implementation steps](docs/implementation_steps.md).
+- [Python-to-Rust migration plan](docs/rust_migration_plan.md).
+- [Rust migration test requirements](docs/rust_migration_test_requirements.md).
 - [Test requirements and cases](docs/test_requirements.md).
-- [Validation status and remaining release checks](docs/validation_status.md).
-- [Code signing policy](docs/code_signing_policy.md): current downloads are unsigned; SignPath is being explored, with no approval or active signing yet.
+- [Rust validation results](docs/rust_migration_validation.md) and [historical Python results](docs/validation_status.md).
+- [Code signing policy](docs/code_signing_policy.md).
 - [SignPath signing flow and setup](docs/signpath_setup.md), with an [application preparation packet](docs/signpath_application.md) for maintainer review.
 - [Project agent guidance](.agent).
 
-Private input belongs in ignored `sample/`; generated drawings and local reports belong in ignored `outputs/`. The GUI concept image contains illustrative data and predates the implemented Help menu and Tk controls.
+Keep private inputs in ignored `sample/` and generated drawings and local reports in ignored `outputs/`.
 
 ## Support development
 
 12dAZ Converter is free and open source. If you find it useful, [buy us a coffee via PayPal](https://paypal.me/12dazapp) to support ongoing development and maintenance.
 
-Support is entirely optional. The same link is available on the startup splash screen and in **Help > About**. It opens your browser only when clicked; the converter does not process payments.
+The optional support link is available on the startup splash and in **Help > About**. It opens PayPal in your browser when selected.
 
 ## License
 
 Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160
 
-Licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses; private survey data is not licensed for redistribution by this project.
+The project uses the [MIT License](LICENSE). Third-party dependencies retain their own licenses. The portable package includes their notices.
