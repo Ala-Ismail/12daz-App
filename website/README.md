@@ -36,7 +36,7 @@ The v0.2.0 homepage was checked locally at 320, 500, 768 and 1280 pixels. The hi
 
 ## Updating a download
 
-`index.html` links to the v0.2.1 pre-release, Windows x64 ZIP and checksum on GitHub. The main [desktop screenshot](assets/12daz-converter-rust-0.2.0.png) shows the Rust application with synthetic data. The [migration validation](../docs/rust_migration_validation.md) records the checks.
+`index.html` links to the v0.3.0 pre-release, Windows x64 ZIP and checksum on GitHub. The main [desktop screenshot](assets/12daz-converter-rust-0.2.0.png) shows the Rust application with synthetic data. The [migration validation](../docs/rust_migration_validation.md) records the checks.
 
 When publishing a new desktop version:
 
@@ -52,7 +52,7 @@ See [website_design.md](website_design.md) for the design brief.
 
 ## Code signing policy
 
-`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The v0.2.1 package is unsigned. Update the policy page and download notice together when the signing status changes.
+`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The v0.3.0 package is unsigned. Update the policy page and download notice together when the signing status changes.
 
 ## Hero image
 
