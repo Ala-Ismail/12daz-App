@@ -32,11 +32,11 @@ Settings reference: [Vercel build configuration](https://vercel.com/docs/builds/
 
 Local Chrome checks passed at viewport widths of 320, 375, 680, 768, 1024 and 1440 pixels: no horizontal page overflow, screenshot loading, internal section links, both download buttons and both support links. Keyboard checks covered the skip link and FAQ toggling, and reduced-motion styling was verified. No browser errors or local asset failures were observed. Desktop and mobile screenshots were visually reviewed.
 
-The v0.1.3 ZIP and checksum URLs both returned HTTP 200 on 15 November 2026. Hosting on Vercel has not yet been verified.
+The v0.2.0 homepage was checked locally at 320, 500, 768 and 1280 pixels. The history table fits at all four widths, the approved GUI screenshot loads at 1330 × 849 pixels, and both download buttons target the same Windows ZIP.
 
 ## Updating a download
 
-`index.html` links to the published v0.1.5 pre-release, Windows x64 ZIP and checksum on GitHub. The FAQ and [Rust desktop preview](assets/12daz-converter-rust-0.2.0.png) describe the locally built v0.2.0 candidate. The [migration validation](../docs/rust_migration_validation.md) records the candidate checks.
+`index.html` links to the v0.2.0 pre-release, Windows x64 ZIP and checksum on GitHub. The main [desktop screenshot](assets/12daz-converter-rust-0.2.0.png) shows the Rust application with synthetic data. The [migration validation](../docs/rust_migration_validation.md) records the checks.
 
 When publishing a new desktop version:
 
@@ -44,7 +44,7 @@ When publishing a new desktop version:
 2. Update both download buttons, the release-notes link and checksum link together.
 3. Update the version labels and preview/release status.
 4. Check product claims against `readme.md` and the validation document for the release.
-5. If changing the screenshot, copy an actual application screenshot into `assets/`, update image dimensions and alternative text, and label its version and demonstration data accurately.
+5. Get maintainer approval for the revised GUI before updating the public sample. Copy the approved application screenshot into `assets/`, update image dimensions and alternative text, and label its version and demonstration data accurately.
 
 The support link is <https://paypal.me/12dazapp>, labelled **Buy me coffee** beneath the download panel and in the footer. A closing section above the footer pairs an actual application screenshot with **Would you buy me a cuppa?** and a **Buy me a cuppa** button. Its image, `assets/12daz-coffee-and-muffin-gui.png`, captures the v0.1.5 GUI after opening `outputs/coffee_and_muffin.12da` through the application's normal loading workflow, with all five models selected and units set to millimetres. The original synthetic drawing and generated DXF remain in ignored `outputs/`.
 
@@ -52,7 +52,7 @@ See [website_design.md](website_design.md) for the design brief.
 
 ## Code signing policy
 
-`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The website states that v0.1.5 is unsigned and multiple signing options are being explored; keep the wording provider-neutral until a provider is selected and signing is activated. The download section also displays the signing status, possible Unknown publisher / SmartScreen warning and checksum guidance. Update both pages and the download notice when a signed release becomes available.
+`code-signing-policy.html` is the public policy page, linked from the download section and footer. Keep its summary aligned with `docs/code_signing_policy.md`. The v0.2.0 package is unsigned. Update the policy page and download notice together when the signing status changes.
 
 ## Hero image
 

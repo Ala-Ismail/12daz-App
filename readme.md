@@ -2,21 +2,21 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-The current source builds the **v0.2.0 Rust candidate** with a Windows desktop app and command-line converter. The published Windows download is [**v0.1.5**](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.5). The Rust candidate passed local package and AutoCAD checks. Clean-machine verification is tracked separately. [Rust validation results](docs/rust_migration_validation.md)
+**v0.2.0** is the first Rust pre-release, with a Windows desktop app and command-line converter. It passed local package and AutoCAD checks. Clean-machine verification is tracked separately. [Download v0.2.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.2.0) · [Rust validation results](docs/rust_migration_validation.md)
 
-![12dAZ Converter Rust v0.2.0 candidate showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
+![12dAZ Converter v0.2.0 showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
 
 *Screenshot uses synthetic demonstration data.*
 
 ## Code signing status and Windows warning
 
-The published v0.1.5 Windows executable and the local v0.2.0 candidate are unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
+The published v0.2.0 Windows package is unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
 
 Use the project's official releases for published downloads. Verify the ZIP against its published `SHA256SUMS.txt` to check download integrity. [GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases)
 
 ## Run the Windows application
 
-Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extracted folder. Keep the files in that folder together. The Rust package includes `az12-converter.exe` for command-line use. The published v0.1.5 ZIP includes an `_internal` folder as part of its bundle.
+Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extracted folder. The desktop requires an OpenGL 2.0 or newer graphics driver. Keep the files in that folder together. The ZIP includes `az12-converter.exe` for command-line use.
 
 1. Open a `.12daz` or `.12da` file.
 2. Review the preview and select the models to export.
@@ -83,7 +83,7 @@ The release workflow uses the Rust manifest where present and uses the Python bu
 ## Project documents
 
 - [Design and original GUI concept](12daz_design.md).
-- [Published v0.1.5 GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
+- [Historical v0.1.5 GUI screenshot](website/assets/12daz-converter-gui.png) using synthetic demonstration data.
 - [Implementation steps](docs/implementation_steps.md).
 - [Python-to-Rust migration plan](docs/rust_migration_plan.md).
 - [Rust migration test requirements](docs/rust_migration_test_requirements.md).

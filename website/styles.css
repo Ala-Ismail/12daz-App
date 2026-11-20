@@ -422,6 +422,43 @@ h3 {
   margin-top: 12px;
   line-height: 1.85;
 }
+.benchmark-table {
+  width: 100%;
+  margin-top: 18px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.benchmark-table caption {
+  padding-bottom: 8px;
+  color: var(--muted);
+  text-align: left;
+}
+.benchmark-table th,
+.benchmark-table td {
+  padding: 10px clamp(6px, 1.5vw, 18px);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.benchmark-table thead {
+  background: var(--panel);
+}
+.benchmark-table td {
+  white-space: nowrap;
+}
+.benchmark-table span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+#history .geometry-content a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .preview-notice {
   border-left: 2px solid #bc995e;
   background: #201f1d;

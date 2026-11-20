@@ -57,6 +57,7 @@
         <nav aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
+          <a href="#history">History</a>
           <a href="https://github.com/Ala-Ismail/12daz-App"
             >GitHub <span aria-hidden="true">↗</span></a
           >
@@ -88,7 +89,7 @@
         <div class="hero-actions">
           <a
             class="button button-primary"
-            href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.5/12dAZ-Converter-0.1.5-Windows-x64.zip"
+            href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.2.0/12dAZ-Converter-0.2.0-Windows-x64.zip"
             ><span aria-hidden="true">↓</span> Download for Windows</a
           >
           <a class="button button-secondary" href="#how-it-works"
@@ -96,7 +97,7 @@
           >
         </div>
         <p class="release-meta">
-          v0.1.5 preview <span aria-hidden="true">/</span> Windows x64
+          v0.2.0 preview <span aria-hidden="true">/</span> Windows x64
           <span aria-hidden="true">/</span> Free &amp; open source
         </p>
           </div>
@@ -111,20 +112,20 @@
             ><span>LOCAL FILES. OFFLINE CONVERSION.</span>
           </div>
           <a
-            href="assets/12daz-converter-gui.png"
+            href="assets/12daz-converter-rust-0.2.0.png"
             aria-label="View the full-size 12dAZ Converter application screenshot"
           >
             <img
-              src="assets/12daz-converter-gui.png"
-              width="1280"
-              height="791"
-              alt="12dAZ Converter v0.1.5 showing four selected survey models, a road plan preview and DXF export settings"
+              src="assets/12daz-converter-rust-0.2.0.png"
+              width="1330"
+              height="849"
+              alt="12dAZ Converter v0.2.0 showing selected survey models, a plan preview and DXF export settings"
               loading="lazy"
             />
           </a>
           <figcaption>
             <span>One workspace. Select, preview, export.</span
-            ><span>v0.1.5 GUI · synthetic demonstration data</span>
+            ><span>v0.2.0 GUI · synthetic demonstration data</span>
           </figcaption>
         </figure>
         <div class="facts" aria-label="Application essentials">
@@ -204,8 +205,7 @@
               <h3>Download &amp; extract</h3>
               <p>
                 Download the Windows ZIP and extract the whole archive. Keep the
-                extracted files together. The v0.1.5 ZIP includes an
-                <code>_internal</code> folder.
+                extracted files together.
               </p>
             </li>
             <li>
@@ -294,15 +294,74 @@
               >A working preview, with qualification still in progress.</strong
             >
             <p>
-              Independent CAD comparison and clean-machine release qualification
-              remain pending. Unsupported content and substitutions are
-              reported; review the report and check exported drawings.
+              Reference outputs were checked in AutoCAD 2022. Clean-machine
+              verification is tracked separately. Review the report for
+              unsupported content and substitutions, and check exported drawings.
             </p>
             <a
-              href="https://github.com/Ala-Ismail/12daz-App/blob/main/docs/validation_status.md"
+              href="https://github.com/Ala-Ismail/12daz-App/blob/main/docs/rust_migration_validation.md"
               >Read the validation status <span aria-hidden="true">↗</span></a
             >
           </aside>
+        </div>
+      </section>
+
+      <section
+        class="section container geometry-section"
+        id="history"
+        aria-labelledby="history-title"
+      >
+        <div class="section-heading">
+          <h2 id="history-title">From Python to Rust</h2>
+          <p>
+            The original Python releases used Tkinter for the desktop and
+            ezdxf for export. The v0.1.5 preview is the reference for checking
+            that the Rust port preserves conversion behaviour.
+          </p>
+          <p>
+            Starting with v0.2.0, the desktop and command-line tools share a
+            Rust conversion engine. The desktop uses egui, and the engine uses
+            acadrust to write DXF 2018. The original Python source remains available in
+            the repository.
+          </p>
+        </div>
+        <div class="geometry-content">
+          <div class="geometry-group">
+            <h3>Measured conversion performance</h3>
+            <p>
+              The Rust CLI completed the conversions <strong>9.4–12.5× as fast</strong>
+              and used <strong>78–87% less peak memory</strong>
+              across the two reference conversions below.
+            </p>
+            <table class="benchmark-table">
+              <caption>Elapsed time and peak working set</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Export mode</th>
+                  <th scope="col">Python</th>
+                  <th scope="col">Rust</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Flatten 2D</th>
+                  <td>5.851 s <span>63.1 MiB</span></td>
+                  <td>0.620 s <span>13.9 MiB</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Keep Z <span>Linear arc grades</span></th>
+                  <td>9.281 s <span>154.9 MiB</span></td>
+                  <td>0.744 s <span>20.1 MiB</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              Both CLIs ran on the same reference survey with the same export
+              options on a Windows x64 PC with an Intel Core i9-13905H.
+              Results vary by drawing and hardware.
+              <a href="https://github.com/Ala-Ismail/12daz-App/blob/main/docs/rust_migration_validation.md#conversion-and-repeatability">Read the benchmark method and results</a>.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -320,28 +379,27 @@
               MIT-licensed source.
             </p>
             <div class="download-tags">
-              <span>Windows x64</span><span>v0.1.5 preview</span
+              <span>Windows x64</span><span>v0.2.0 preview</span
               ><span>ZIP</span>
             </div>
           </div>
           <div class="download-actions">
             <a
               class="button button-primary"
-              href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.5/12dAZ-Converter-0.1.5-Windows-x64.zip"
+              href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.2.0/12dAZ-Converter-0.2.0-Windows-x64.zip"
               ><span aria-hidden="true">↓</span> Download for Windows</a
             >
             <p>
-              Extract the complete ZIP, then run<br /><code
-                >12dAZ-Converter.exe</code
-              >.
+              Extract the complete ZIP, then run <code>12dAZ-Converter.exe</code>.
+              The desktop requires an OpenGL 2.0 or newer graphics driver.
             </p>
             <div class="release-links">
               <a
-                href="https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.1.5"
+                href="https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.2.0"
                 >Release notes</a
               ><span aria-hidden="true">·</span
               ><a
-                href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.1.5/SHA256SUMS.txt"
+                href="https://github.com/Ala-Ismail/12daz-App/releases/download/v0.2.0/SHA256SUMS.txt"
                 >SHA-256 checksum</a
               >
             </div>
@@ -352,7 +410,7 @@
           <p>
             We are exploring multiple options for trusted code signing.
             Signing is not yet active. The current
-            <strong>v0.1.5 Windows executable is unsigned</strong>, so Windows
+            <strong>v0.2.0 Windows package is unsigned</strong>, so Windows
             may show an <strong>Unknown publisher</strong>
             notice or this Microsoft Defender SmartScreen warning:
           </p>
@@ -397,14 +455,12 @@
             </p>
           </details>
           <details>
-            <summary>What is the Rust v0.2.0 candidate?</summary>
+            <summary>What changed in v0.2.0?</summary>
             <p>
-              The project source now includes a Rust desktop converter and a
-              separate command-line executable. The candidate passed local DXF
-              and Windows package checks. Clean-machine verification is tracked
-              separately. The public download on this page is v0.1.5.
-              <a href="https://github.com/Ala-Ismail/12daz-App">View the project source</a>
-              or <a href="assets/12daz-converter-rust-0.2.0.png">see the Rust desktop preview</a>.
+              The Windows ZIP includes the Rust desktop converter and
+              <code>az12-converter.exe</code> for command-line use. Both use the
+              same conversion engine. Clean-machine verification is tracked separately.
+              <a href="https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.2.0">Read the release notes</a>.
             </p>
           </details>
           <details>

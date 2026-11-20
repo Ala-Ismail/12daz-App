@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Maintain the offline Windows x64 12daz/12da to DXF 2018 converter. The Rust candidate is v0.2.0. The published Windows release is v0.1.5. Use docs/rust_migration_validation.md for actual test evidence. RUST-17 is disabled for this migration run at the maintainer's request and is tracked separately for clean-machine verification.
+Maintain the offline Windows x64 12daz/12da to DXF 2018 converter. The first published Rust pre-release is v0.2.0. Use docs/rust_migration_validation.md for actual test evidence. RUST-17 was disabled for the migration run at the maintainer's request and is tracked separately for clean-machine verification.
 
 ## Source of truth
 
@@ -43,6 +43,8 @@ Keep private survey fixtures in ignored sample/ and generated conversion output 
 ## GUI theme and preview
 
 Preserve the dark grey theme, blue primary actions and three-panel layout. Share the 30,000-point preview allowance across selected models and regenerate it in the background after selection changes. Never apply a stale preview job result or limit DXF output to display geometry.
+
+Get maintainer approval for the revised GUI before replacing its public sample on the website. Use an actual screenshot with synthetic demonstration data.
 
 ## GUI help
 
