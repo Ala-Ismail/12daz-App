@@ -2,7 +2,7 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-**v0.2.0** is the first Rust pre-release, with a Windows desktop app and command-line converter. It passed local package and AutoCAD checks. Clean-machine verification is tracked separately. [Download v0.2.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.2.0) · [Rust validation results](docs/rust_migration_validation.md)
+**v0.2.1** fixes the export panel widening when the mouse moves in the Rust desktop app. The Windows ZIP includes the desktop app and command-line converter. Clean-machine verification is tracked separately. [Download v0.2.1](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.2.1) · [Rust validation results](docs/rust_migration_validation.md)
 
 ![12dAZ Converter v0.2.0 showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
 
@@ -10,7 +10,7 @@ Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Ex
 
 ## Code signing status and Windows warning
 
-The published v0.2.0 Windows package is unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
+The published v0.2.1 Windows package is unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
 
 Use the project's official releases for published downloads. Verify the ZIP against its published `SHA256SUMS.txt` to check download integrity. [GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases)
 
@@ -67,7 +67,7 @@ The reference survey produced equivalent Python and Rust reports and reopened ge
 ```powershell
 cargo test --manifest-path rust/Cargo.toml --locked --features desktop
 .\scripts\build_rust_windows.ps1
-.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.2.0-Windows-x64.zip
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.2.1-Windows-x64.zip
 ```
 
 The package script writes a ZIP and `SHA256SUMS.txt` to `dist/rust-candidate/`. Use `-OutputDirectory` to build into another folder and `-Offline` after the locked dependencies are cached. The package test verifies the checksum and executable metadata, opens the extracted desktop in smoke-test mode, and checks GUI/CLI parity with synthetic data.
