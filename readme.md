@@ -2,7 +2,7 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-**v0.3.0** adds background maps to the desktop plan preview. Use **View → Background Map** for OpenStreetMap Streets, Google Satellite with Labels, or Esri World Imagery with Labels. Assign the survey datum, MGA zone and source units, or align a local grid using control points. Google and Esri require your own API key. The Windows ZIP includes the desktop app and command-line converter. Clean-machine verification is tracked separately. [Download v0.3.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.3.0) · [Rust validation results](docs/rust_migration_validation.md)
+**v0.3.0** adds [background maps](#background-maps) to the Rust desktop plan preview. The Windows ZIP includes the desktop app and command-line converter. Clean-machine verification is tracked separately. [Download v0.3.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.3.0) · [Rust validation results](docs/rust_migration_validation.md)
 
 ![12dAZ Converter v0.2.0 showing selected models, a plan preview and export settings](website/assets/12daz-converter-rust-0.2.0.png)
 
@@ -24,6 +24,17 @@ Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extr
 4. Select **Export DXF** and review warnings in **Report**. A `.dxf.conversion.json` report is saved beside the drawing.
 
 **Help** provides the offline User Guide, About, license, and dependency notices. Cancel requests safe cleanup before output publication.
+
+## Background maps
+
+1. Open a survey and select **View → Background Map**. Choose the **MGA datum and zone** (GDA2020 or GDA94, zones 46–56) and confirm the **Source coordinate units**.
+2. Choose **Already on MGA** for projected survey coordinates. For a **Local grid**, match one survey point to a known MGA or WGS 84 position for translation, or add a second point for scale and rotation. Select **Apply**.
+3. Select **OpenStreetMap Streets**, **Google Satellite with Labels**, or **Esri World Imagery with Labels**. OpenStreetMap requires no key. For Google or Esri, follow the setup steps in **Help → User Guide**. Enter your API key and select **Set key**. Select **Remember this key on this PC** before setting it to store it in Windows Credential Manager.
+4. Adjust the map opacity to keep survey linework readable. Use **Save alignment** to store the alignment and source units beside the survey in a `.12daz-map.json` sidecar.
+
+Maps are off by default. When enabled, the selected provider receives requests for the visible map area. The basemap serves as a visual reference in the plan preview. DXF export runs offline and preserves the source coordinates.
+
+[Website examples](https://12daz-app-website.vercel.app/#background-maps) · [Background map integration design](design.md) · [Background map test requirements](docs/background_map_test_requirements.md)
 
 ## Run from source
 
