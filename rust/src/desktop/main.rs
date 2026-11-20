@@ -376,17 +376,8 @@ impl Desktop {
                     });
                     ui.separator();
                     ui.label(RichText::new("Output file").strong().color(TEXT));
-                    ui.horizontal(|ui| {
-                        let width = (ui.available_width() - 69.0).max(70.0);
-                        let response = ui.add(
-                            egui::TextEdit::singleline(&mut self.state.output)
-                                .hint_text("Choose a DXF file…")
-                                .desired_width(width),
-                        );
-                        if response.changed() {
-                            self.state.settings_changed();
-                        }
-                        response.on_hover_text(&self.state.output);
+                    // Give Browse its measured width before filling the rest with the path field.
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .button("Browse")
                             .on_hover_text("Browse for the output DXF")
@@ -394,6 +385,15 @@ impl Desktop {
                         {
                             self.choose_output();
                         }
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut self.state.output)
+                                .hint_text("Choose a DXF file…")
+                                .desired_width(f32::INFINITY),
+                        );
+                        if response.changed() {
+                            self.state.settings_changed();
+                        }
+                        response.on_hover_text(&self.state.output);
                     });
                     ui.collapsing("Input options", |ui| {
                         ui.label("Fallback encoding");
@@ -908,6 +908,68 @@ mod tests {
                     "{label}: {bounds:?} at {scale}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn rust_16_hover_and_splash_do_not_resize_the_export_panel() {
+        for scale in [1.0, 1.25, 1.5, 1.75, 2.0] {
+            let ctx = egui::Context::default();
+            let mut desktop = Desktop::new(&ctx, true);
+            let export_panel = || {
+                egui::containers::panel::PanelState::load(&ctx, egui::Id::new("export-settings"))
+                    .unwrap()
+            };
+            frame(&ctx, &mut desktop, scale, vec![]);
+            for tick in 0..40 {
+                if tick == 4 {
+                    desktop.splash_until = Some(Instant::now());
+                }
+                if tick == 20 {
+                    desktop.state.keep_z = true;
+                    desktop.state.output =
+                        "C:\\Surveys\\Example subdivision\\Export\\Plan_with_elevations.dxf".into();
+                }
+                let pointer = egui::pos2(470.0 + tick as f32 * 5.0, 180.0);
+                frame(
+                    &ctx,
+                    &mut desktop,
+                    scale,
+                    vec![egui::Event::PointerMoved(pointer)],
+                );
+                let width = export_panel().size().x;
+                assert!(
+                    (width - 264.0).abs() <= 1.0,
+                    "export panel width {width} at scale {scale}, frame {tick}",
+                );
+            }
+
+            let splitter = export_panel().outer_rect.left_center();
+            let narrower = splitter + Vec2::new(40.0, 0.0);
+            for event in [
+                egui::Event::PointerMoved(splitter),
+                egui::Event::PointerButton {
+                    pos: splitter,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+                egui::Event::PointerMoved(narrower),
+                egui::Event::PointerButton {
+                    pos: narrower,
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: egui::Modifiers::NONE,
+                },
+                egui::Event::PointerMoved(egui::pos2(620.0, 180.0)),
+            ] {
+                frame(&ctx, &mut desktop, scale, vec![event]);
+            }
+            let width = export_panel().size().x;
+            assert!(
+                (width - 224.0).abs() <= 1.0,
+                "export panel width after dragging {width} at scale {scale}",
+            );
         }
     }
 
