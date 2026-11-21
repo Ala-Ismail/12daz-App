@@ -1029,6 +1029,7 @@ details a {
   object-fit: cover;
   object-position: 62% top;
 }
+.hero-photo .hero-slide-aerial { object-position: center 52%; }
 .hero-credit {
   position: absolute;
   bottom: 14px;
@@ -1040,6 +1041,7 @@ details a {
   color: #c5cbd4;
   font: 9px/1.6 var(--mono);
 }
+.hero-credit a { color: inherit; text-decoration: underline; }
 .hero-slides { display: grid; height: 100%; }
 .hero-slides .hero-slide {
   grid-area: 1 / 1;

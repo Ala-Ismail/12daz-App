@@ -24,17 +24,26 @@
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <div class="hero-masthead">
-          <figure class="hero-photo" aria-label="Illustrative survey scenes">
+          <figure class="hero-photo" aria-label="Survey imagery">
             <div class="hero-slides">
             <img
-              class="hero-slide is-active"
+              class="hero-slide hero-slide-aerial is-active"
+              src="assets/12daz-converter-mga55-simulated-aerial.webp"
+              width="1330"
+              height="849"
+              alt="12dAZ Converter showing a synthetic MGA Zone 55 survey over simulated satellite imagery"
+              data-hero-credit="aerial"
+              fetchpriority="high"
+            />
+            <img
+              class="hero-slide"
               src="assets/surveyor-hero.webp"
               srcset="assets/surveyor-hero-960.webp 960w, assets/surveyor-hero.webp 1672w"
               sizes="100vw"
               width="1672"
               height="941"
               alt="Illustrative scene of two surveyors, an Asian woman and an older man wearing glasses, working with a total station beside a laptop displaying a synthetic road survey plan"
-              fetchpriority="high"
+              aria-hidden="true"
             />
             <img class="hero-slide" src="assets/surveyor-port.webp"
               srcset="assets/surveyor-port-960.webp 960w, assets/surveyor-port.webp 1672w"
@@ -46,7 +55,10 @@
               width="1536" height="864" alt="A surveyor wearing a hijab and hard hat drives an open-top utility vehicle carrying a tripod and survey equipment through an open-pit mine" aria-hidden="true" />
             </div>
           </figure>
-          <p class="hero-credit">AI-generated scene · synthetic survey · illustrative interface</p>
+          <p class="hero-credit">
+            <span data-hero-caption="aerial">Simulated satellite view · Road layout <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></span>
+            <span data-hero-caption="illustration" hidden>AI-generated scene · synthetic survey · illustrative interface</span>
+          </p>
           <button class="hero-pause" type="button" hidden>Pause slideshow</button>
     <header class="site-header">
       <div class="container header-inner">

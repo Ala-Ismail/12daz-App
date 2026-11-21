@@ -1,6 +1,7 @@
 (() => {
   const slides = [...document.querySelectorAll('.hero-slide')];
   const button = document.querySelector('.hero-pause');
+  const captions = document.querySelectorAll('[data-hero-caption]');
   if (slides.length < 2 || !button) return;
 
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -20,6 +21,8 @@
       slides[current].setAttribute('aria-hidden', 'true');
       slides[next].classList.add('is-active');
       slides[next].removeAttribute('aria-hidden');
+      const credit = slides[next].dataset.heroCredit ?? 'illustration';
+      captions.forEach(caption => { caption.hidden = caption.dataset.heroCaption !== credit; });
       current = next;
     }, 5000);
   }
