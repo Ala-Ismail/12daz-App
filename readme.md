@@ -2,7 +2,7 @@
 
 Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Export in **Flatten 2D** mode to set Z to zero, or choose **Keep Z** to retain known source elevations on supported geometry. The converter writes one layer per model and runs without 12d Model or AutoCAD installed.
 
-**v0.3.0** adds [background maps](#background-maps) to the Rust desktop plan preview. The Windows ZIP includes the desktop app and command-line converter. Clean-machine verification is tracked separately. [Download v0.3.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.3.0) · [Rust validation results](docs/rust_migration_validation.md)
+**v0.4.0** adds [automatic projection suggestions](#automatic-projection-suggestions), Brisbane City Survey Grid support, and a skipped-elements preview. The Windows ZIP includes the desktop app and command-line converter. [Download v0.4.0](https://github.com/Ala-Ismail/12daz-App/releases/tag/v0.4.0) · [Road-engine validation](docs/road_boundary_engine_test_requirements.md#84-integrated-corridor-comparison)
 
 ![12dAZ Converter v0.3.0 showing synthetic road, property and utility linework over OpenStreetMap](website/assets/12daz-converter-mga55-openstreetmap.png)
 
@@ -10,7 +10,7 @@ Offline Windows desktop converter from **12daz / 12da to editable DXF 2018**. Ex
 
 ## Code signing status and Windows warning
 
-The published v0.3.0 Windows package is unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
+The published v0.4.0 Windows package is unsigned. Windows may display an **Unknown publisher** notice or a Microsoft Defender SmartScreen warning. The project is preparing optional publisher signing. [Code signing policy](docs/code_signing_policy.md)
 
 Use the project's official releases for published downloads. Verify the ZIP against its published `SHA256SUMS.txt` to check download integrity. [GitHub Releases](https://github.com/Ala-Ismail/12daz-App/releases)
 
@@ -27,20 +27,20 @@ Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extr
 
 ## Background maps
 
-1. Open a survey and select **View → Background Map**. Choose the **Survey projection** and confirm the **Source coordinate units**. The published v0.3.0 preview supports GDA2020 and GDA94 MGA zones 46–56.
+1. Open a survey and select **View → Background Map**. Choose the **Survey projection** and confirm the **Source coordinate units**. The preview supports GDA2020 and GDA94 MGA zones 46–56.
 2. Use the direct grid option for surveyed coordinates already on the selected projection. For a **Local grid**, match one survey point to a known projected or WGS 84 position for translation, or add a second point for scale and rotation. Select **Apply**.
 3. Select **OpenStreetMap Streets**, **Google Satellite with Labels**, or **Esri World Imagery with Labels**. OpenStreetMap requires no key. For Google or Esri, follow the setup steps in **Help → User Guide**. Enter your API key and select **Set key**. Select **Remember this key on this PC** before setting it to store it in Windows Credential Manager.
 4. Adjust the map opacity to keep survey linework readable. Use **Save alignment** to store the alignment and source units beside the survey in a `.12daz-map.json` sidecar.
 
 Maps are off by default. When enabled, the selected provider receives requests for the visible map area. The basemap serves as a visual reference in the plan preview. DXF export runs offline and preserves the source coordinates.
 
-Builds from the current Rust source also support **GDA94 / BCSG02 (EPSG:3113)** and **GDA2020 / BCSG2020 (EPSG:20047)**. Use **Manual grid selection** under **Projection suggestions** when you already know the grid, source units or project location. During **Compare on OpenStreetMap**, choose a road centreline model and select **Check visible road match** for an approximate score from the displayed tiles. You can also compare road and boundary models against a local OpenStreetMap GeoJSON extract. Apply the projection after confirming it.
+The map also supports **GDA94 / BCSG02 (EPSG:3113)** and **GDA2020 / BCSG2020 (EPSG:20047)**. Use **Manual grid selection** under **Projection suggestions** when you already know the grid, source units or project location. During **Compare on OpenStreetMap**, choose a road centreline model and select **Check visible road match** for an approximate score from the displayed tiles. You can also compare road and boundary models against a local OpenStreetMap GeoJSON extract. Apply the projection after confirming it.
 
 [Website examples](https://12daz-app-website.vercel.app/#background-maps)
 
 ### Automatic projection suggestions
 
-In current source builds, select **View > Background Map > Projection suggestions > Detect MGA**. The app checks compatible grids in the background and shows up to three ranked results. It assumes metres when units are unset. Datum variants appear under the same grid.
+Select **View > Background Map > Projection suggestions > Detect MGA**. The app checks compatible grids in the background and shows up to three ranked results. It assumes metres when units are unset. Datum variants appear under the same grid.
 
 Detect MGA uses local road vectors first. For missing coverage it sends only the candidate area bounds to OpenStreetMap Overpass. To compare offline on open, put a local WGS 84 extract beside the archive, for example `survey.12daz.osm-roads.geojson`.
 
@@ -81,7 +81,7 @@ For Keep Z, **Plan tolerance** and **Elevation tolerance** each default to **0.0
 
 **4D strings and contours are deferred.** TINs, meshes, symbols, rendered annotations and paper/screen-size text are unsupported. The report identifies skipped objects, omitted alignment labels and drainage attributes, and style substitutions. The GUI preview prioritizes bends, outlines and spatial coverage within a shared 30,000-point allowance. Export uses the selected geometry and tolerances independently of that allowance.
 
-In builds from the current source, **View → Show skipped elements** opens a small window showing what the selected models and geometry settings would skip. Inspect the reasons and select entries to locate them on the plan where usable coordinates are available.
+**View → Show skipped elements** opens a small window showing what the selected models and geometry settings would skip. Inspect the reasons and select entries to locate them on the plan where usable coordinates are available.
 
 The reference survey produced equivalent Python and Rust reports and reopened geometry in both export modes. [Rust validation results](docs/rust_migration_validation.md)
 

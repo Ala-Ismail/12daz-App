@@ -4,7 +4,7 @@
 
 ## Current status
 
-The project is preparing for the SignPath Foundation open-source signing programme. The signing workflow and artifact configuration are prepared, with application, account configuration and activation pending. The published v0.3.0 Windows package is unsigned. A matching checksum verifies download integrity. Publisher signatures are verified separately.
+The project is preparing for the SignPath Foundation open-source signing programme. The signing workflow and artifact configuration are prepared, with application, account configuration and activation pending. The published v0.4.0 Windows package is unsigned. A matching checksum verifies download integrity. Publisher signatures are verified separately.
 
 The Azure signing integration described in [code_signing.md](code_signing.md) is a separate, inactive option; it does not provide SignPath access. Future release notes will identify the signing status of each release.
 
