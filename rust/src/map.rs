@@ -19,7 +19,11 @@ use std::f64::consts::PI;
 use proj4rs::proj::Proj;
 use serde::{Deserialize, Serialize};
 
+pub mod corridor_match;
+pub mod detection;
 mod registration;
+pub mod road_corridor;
+pub mod road_match;
 pub mod sidecar;
 pub use registration::{MapRegistration, SourceUnit};
 
@@ -300,6 +304,10 @@ pub enum CrsId {
     Wgs84,
     #[serde(rename = "EPSG:3857")]
     WebMercator,
+    #[serde(rename = "EPSG:3113")]
+    Gda94Bcsg02,
+    #[serde(rename = "EPSG:20047")]
+    Gda2020Bcsg2020,
     #[serde(rename = "EPSG:7855")]
     Gda2020MgaZone55,
     #[serde(rename = "EPSG:7846")]
@@ -347,6 +355,12 @@ pub enum CrsId {
 }
 
 impl CrsId {
+    pub const BRISBANE: [Self; 2] = [Self::Gda2020Bcsg2020, Self::Gda94Bcsg02];
+
+    pub const fn is_survey_grid(self) -> bool {
+        !matches!(self, Self::Wgs84 | Self::WebMercator)
+    }
+
     pub const MGA: [Self; 22] = [
         Self::Gda2020MgaZone46,
         Self::Gda2020MgaZone47,
@@ -377,6 +391,8 @@ impl CrsId {
         match self {
             Self::Wgs84 => "EPSG:4326",
             Self::WebMercator => "EPSG:3857",
+            Self::Gda94Bcsg02 => "EPSG:3113",
+            Self::Gda2020Bcsg2020 => "EPSG:20047",
             Self::Gda2020MgaZone46 => "EPSG:7846",
             Self::Gda2020MgaZone47 => "EPSG:7847",
             Self::Gda2020MgaZone48 => "EPSG:7848",
@@ -773,26 +789,26 @@ pub fn from_wgs84(crs: CrsId, point: LonLat) -> Result<Coordinate> {
 
 pub struct Projection {
     crs: CrsId,
-    mga: Option<(Proj, Proj)>,
+    projected: Option<(Proj, Proj)>,
 }
 
 impl Projection {
     pub fn new(crs: CrsId) -> Result<Self> {
-        let mga = if crs.mga_details().is_some() {
+        let projected = if crs.is_survey_grid() {
             let read = |definition: &str| {
                 Proj::from_proj_string(definition).map_err(|_| MapError::TransformationFailed)
             };
-            Some((read(&mga_proj(crs)?)?, read(WGS84)?))
+            Some((read(&survey_proj(crs)?)?, read(WGS84)?))
         } else {
             None
         };
-        Ok(Self { crs, mga })
+        Ok(Self { crs, projected })
     }
 
     pub fn to_wgs84(&self, point: Coordinate) -> Result<LonLat> {
-        match &self.mga {
-            Some((mga, geographic)) => {
-                let radians = proj_transform_raw(mga, geographic, point)?;
+        match &self.projected {
+            Some((grid, geographic)) => {
+                let radians = proj_transform_raw(grid, geographic, point)?;
                 LonLat::new(radians.x.to_degrees(), radians.y.to_degrees())
             }
             None if self.crs == CrsId::WebMercator => web_mercator_to_wgs84(point),
@@ -801,11 +817,11 @@ impl Projection {
     }
 
     pub fn from_wgs84(&self, point: LonLat) -> Result<Coordinate> {
-        match &self.mga {
-            Some((mga, geographic)) => {
+        match &self.projected {
+            Some((grid, geographic)) => {
                 let radians =
                     Coordinate::new(point.longitude.to_radians(), point.latitude.to_radians())?;
-                proj_transform_raw(geographic, mga, radians)
+                proj_transform_raw(geographic, grid, radians)
             }
             None if self.crs == CrsId::WebMercator => wgs84_to_web_mercator(point),
             None => Coordinate::new(point.longitude, point.latitude),
@@ -815,17 +831,30 @@ impl Projection {
 
 const WGS84: &str = "+proj=longlat +datum=WGS84 +no_defs +type=crs";
 
-fn mga_proj(crs: CrsId) -> Result<String> {
-    let (datum, zone) = crs.mga_details().ok_or(MapError::TransformationFailed)?;
+fn survey_proj(crs: CrsId) -> Result<String> {
+    let (conversion, legacy) = match crs {
+        CrsId::Gda94Bcsg02 => (
+            "+proj=tmerc +lat_0=-28 +lon_0=153 +k=0.99999 +x_0=50000 +y_0=100000".into(),
+            true,
+        ),
+        CrsId::Gda2020Bcsg2020 => (
+            "+proj=tmerc +lat_0=-28 +lon_0=153 +k=0.99999 +x_0=150000 +y_0=200000".into(),
+            false,
+        ),
+        _ => {
+            let (datum, zone) = crs.mga_details().ok_or(MapError::TransformationFailed)?;
+            (format!("+proj=utm +zone={zone} +south"), datum == "GDA94")
+        }
+    };
     // EPSG:8048 uses coordinate-frame rotations. PROJ towgs84 uses the opposite signs.
     // GDA2020 then approximates WGS 84 for basemap display without an epoch or distortion grid.
-    let shift = if datum == "GDA94" {
+    let shift = if legacy {
         "0.06155,-0.01087,-0.04019,0.0394924,0.0327221,0.0328979,-0.009994"
     } else {
         "0,0,0,0,0,0,0"
     };
     Ok(format!(
-        "+proj=utm +zone={zone} +south +ellps=GRS80 +towgs84={shift} +units=m +no_defs +type=crs"
+        "{conversion} +ellps=GRS80 +towgs84={shift} +units=m +no_defs +type=crs"
     ))
 }
 

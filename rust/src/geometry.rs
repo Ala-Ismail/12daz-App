@@ -883,6 +883,84 @@ pub(crate) fn skipped_location(source: &SourceEntity) -> Option<Point> {
     ])
 }
 
+#[cfg(feature = "desktop")]
+pub(crate) fn visit_source_xy(
+    source: &SourceEntity,
+    cancel: Option<&AtomicBool>,
+    mut visit: impl FnMut(Point),
+) -> crate::error::Result<()> {
+    let Ok(mut props) = fields(&source.block) else {
+        return Ok(());
+    };
+    if TRANSFORMS.iter().any(|name| props.contains_key(*name)) {
+        return Ok(());
+    }
+    let null = source.defaults.get("null").map(String::as_str);
+    let finite_pair = |x: &str, y: &str| {
+        if Some(x) == null || Some(y) == null {
+            return None;
+        }
+        Some([number(Some(x), "X").ok()?, number(Some(y), "Y").ok()?])
+    };
+    let named: &[(&str, &str)] = match source.kind.as_str() {
+        "arc" => &[("xstart", "ystart"), ("xend", "yend")],
+        "circle" => &[("xcentre", "ycentre")],
+        "text" => &[("x", "y")],
+        "super_alignment" => {
+            let Some(Item::Block(horizontal)) = props.get("horizontal_data") else {
+                return Ok(());
+            };
+            let Ok(solved) = fields(horizontal) else {
+                return Ok(());
+            };
+            if TRANSFORMS.iter().any(|name| solved.contains_key(*name)) {
+                return Ok(());
+            }
+            props = solved;
+            &[]
+        }
+        "super" | "2d" | "3d" | "polyline" => &[],
+        _ => return Ok(()),
+    };
+    for &(x, y) in named {
+        if let (Ok(Some(x)), Ok(Some(y))) = (scalar(&props, x, None), scalar(&props, y, None))
+            && let Some(point) = finite_pair(x, y)
+        {
+            visit(point);
+        }
+    }
+    if !named.is_empty() {
+        return Ok(());
+    }
+    let mut blocks = ["data_2d", "data_3d", "data"]
+        .into_iter()
+        .filter_map(|key| props.get(key).map(|item| (key, *item)));
+    let Some((key, Item::Block(block))) = blocks.next() else {
+        return Ok(());
+    };
+    let stride = if key == "data_2d" || source.kind == "2d" {
+        2
+    } else if source.kind == "polyline" || (source.kind == "super" && key == "data") {
+        5
+    } else {
+        3
+    };
+    if blocks.next().is_some() || !block.items.len().is_multiple_of(stride) {
+        return Ok(());
+    }
+    for (index, vertex) in block.items.chunks_exact(stride).enumerate() {
+        if index % 512 == 0 {
+            checkpoint(cancel)?;
+        }
+        if let [Item::Token(x), Item::Token(y), ..] = vertex
+            && let Some(point) = finite_pair(&x.value, &y.value)
+        {
+            visit(point);
+        }
+    }
+    Ok(())
+}
+
 pub fn convert_geometry(
     source: &SourceEntity,
     options: GeometryOptions,

@@ -2,7 +2,10 @@
 
 mod backdrop;
 mod canvas;
+mod map_detection;
 mod map_tiles;
+mod road_image;
+mod road_reference;
 mod smoke;
 mod state;
 mod theme;
@@ -26,6 +29,17 @@ const LOGO: &[u8] = include_bytes!("../../resources/logo.png");
 const LICENSE: &str = include_str!("../../../LICENSE");
 const UNITS: [&str; 4] = ["metres", "millimetres", "feet", "inches"];
 const ENCODINGS: [&str; 4] = ["cp1252", "utf-8", "utf-16-le", "utf-16-be"];
+const PROJECTION_GUIDE_SECTION: &str = "1.9 Map projection suggestions";
+const HELP_ITEMS: [(&str, Dialog, Option<&str>); 4] = [
+    ("User Guide", Dialog::Guide, None),
+    (
+        "Map Projection Suggestions",
+        Dialog::Guide,
+        Some(PROJECTION_GUIDE_SECTION),
+    ),
+    ("About 12dAZ Converter", Dialog::About, None),
+    ("License and Third-party Notices", Dialog::License, None),
+];
 
 #[derive(Clone, Copy)]
 enum Dialog {
@@ -143,13 +157,9 @@ impl Desktop {
                 }
             });
             ui.menu_button("Help", |ui| {
-                for (label, dialog) in [
-                    ("User Guide", Dialog::Guide),
-                    ("About 12dAZ Converter", Dialog::About),
-                    ("License and Third-party Notices", Dialog::License),
-                ] {
+                for (label, dialog, section) in HELP_ITEMS {
                     if ui.button(label).clicked() {
-                        self.dialog = Some(dialog);
+                        self.open_help_item(dialog, section);
                         ui.close();
                     }
                 }
@@ -464,6 +474,16 @@ impl Desktop {
                 .as_ref()
                 .map(|report| (report.input.as_path(), report.input_sha256.as_str())),
         );
+        let evidence = self
+            .state
+            .scan
+            .as_ref()
+            .and_then(|report| report.map_evidence.as_ref());
+        self.backdrop.update_detection(ui.ctx(), evidence);
+        let comparison_source = (!self.state.waiting())
+            .then_some((self.state.preview.as_slice(), self.state.preview_revision()));
+        self.backdrop
+            .comparison_controls(ui, &mut self.view, comparison_source);
         ui.horizontal(|ui| {
             theme::heading(ui, "Plan preview");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -749,6 +769,17 @@ impl Desktop {
         });
     }
 
+    fn open_help_item(&mut self, dialog: Dialog, section: Option<&str>) {
+        if let Some(section) = section
+            && let Some(index) = guide_sections(GUIDE)
+                .iter()
+                .position(|(title, _)| *title == section)
+        {
+            self.guide_section = index;
+        }
+        self.dialog = Some(dialog);
+    }
+
     fn show_dialog(&mut self, ctx: &egui::Context) {
         let Some(dialog) = self.dialog else { return };
         let mut close = false;
@@ -759,13 +790,9 @@ impl Desktop {
             match dialog {
                 Dialog::HelpMenu => {
                     ui.heading("Help");
-                    for (label, target) in [
-                        ("User Guide", Dialog::Guide),
-                        ("About 12dAZ Converter", Dialog::About),
-                        ("License and Third-party Notices", Dialog::License),
-                    ] {
+                    for (label, target, section) in HELP_ITEMS {
                         if ui.button(label).clicked() {
-                            followup = Some(target);
+                            followup = Some((target, section));
                         }
                     }
                 }
@@ -809,8 +836,8 @@ impl Desktop {
         if close || overwrite || shown.should_close() {
             self.dialog = None;
         }
-        if followup.is_some() {
-            self.dialog = followup;
+        if let Some((target, section)) = followup {
+            self.open_help_item(target, section);
         }
         if overwrite {
             self.start_export(true);
@@ -887,7 +914,9 @@ impl Desktop {
             .show(ui, |ui| self.preview(ui));
         self.skipped_window(&ctx);
         self.show_dialog(&ctx);
-        self.backdrop.dialog(&ctx);
+        let comparison_source = (!self.state.waiting())
+            .then_some((self.state.preview.as_slice(), self.state.preview_revision()));
+        self.backdrop.dialog(&ctx, &self.view, comparison_source);
         self.splash(&ctx);
     }
 }
@@ -1290,19 +1319,47 @@ mod tests {
     }
 
     #[test]
-    fn user_guide_indexes_provider_setup_and_preserves_numbered_steps() {
+    fn user_guide_indexes_projection_and_provider_setup() {
         let sections = guide_sections(GUIDE);
-        assert_eq!(sections.len(), 11);
+        assert_eq!(sections.len(), 12);
         for (index, (title, body)) in sections.iter().enumerate() {
             assert!(title.starts_with(&format!("1.{} ", index + 1)));
             assert!(!body.is_empty());
         }
-        let google = sections[8].1.join("\n");
+        assert_eq!(sections[8].0, PROJECTION_GUIDE_SECTION);
+        let projection = sections[8].1.join("\n");
+        for detail in [
+            "Detect MGA",
+            "Apply reviewed grid",
+            "Overpass",
+            ".osm-roads.geojson",
+            "More than 70%",
+        ] {
+            assert!(projection.contains(detail));
+        }
+        let google = sections[9].1.join("\n");
         assert!(google.contains("1. Sign in") && google.contains("Map Tiles API"));
         assert!(google.contains("https://developers.google.com/"));
-        let esri = sections[9].1.join("\n");
+        let esri = sections[10].1.join("\n");
         assert!(esri.contains("API key credentials") && esri.contains("Static Basemap Tiles"));
         assert!(esri.contains("https://developers.arcgis.com/"));
+    }
+
+    #[test]
+    fn projection_suggestions_help_opens_the_indexed_offline_topic() {
+        let ctx = egui::Context::default();
+        let mut desktop = Desktop::new(&ctx, false);
+        let (_, dialog, section) = HELP_ITEMS
+            .iter()
+            .copied()
+            .find(|(label, _, _)| *label == "Map Projection Suggestions")
+            .unwrap();
+        desktop.open_help_item(dialog, section);
+        assert!(matches!(desktop.dialog, Some(Dialog::Guide)));
+        assert_eq!(
+            guide_sections(GUIDE)[desktop.guide_section].0,
+            PROJECTION_GUIDE_SECTION,
+        );
     }
 
     #[test]

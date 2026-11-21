@@ -98,6 +98,10 @@ impl State {
         self.busy() || self.pending.is_some()
     }
 
+    pub fn preview_revision(&self) -> u64 {
+        self.revision
+    }
+
     pub fn can_open(&self) -> bool {
         self.running
             .as_ref()

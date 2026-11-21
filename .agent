@@ -40,7 +40,7 @@ Use the case IDs in docs/test_requirements.md and docs/rust_migration_test_requi
 ```powershell
 cargo test --manifest-path rust/Cargo.toml --locked --features desktop
 .\scripts\build_rust_windows.ps1
-.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.3.0-Windows-x64.zip
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.4.0-Windows-x64.zip
 ```
 
 Use Python 3.11 with the pinned ezdxf version for the independent audit and parity tests. Set `RUST_MIGRATION_CLI` to the built CLI and run `python -m unittest discover -s tests -p test_rust_migration.py -v`. Record executed results, CAD interoperability, package evidence and benchmark hardware. Use .github/workflows/test.yml for Windows release builds and docs/github_release.md for tagging and signing steps. Change public version and download links after verifying the corresponding release assets.

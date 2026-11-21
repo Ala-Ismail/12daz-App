@@ -1,13 +1,22 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use az12_converter::geometry::Point;
+use az12_converter::geometry::{Kind, Point};
+use az12_converter::map::detection::{ArchiveEvidence, Candidate};
 use az12_converter::map::{
-    Coordinate, CrsId, LonLat, MapMode, MapRegistration, Projection, SourceUnit, TileId, sidecar,
-    tile_coordinate,
+    Coordinate, CrsId, LonLat, MapMode, MapRegistration, Projection, SourceUnit, TileId,
+    road_match::{Grid, Segment},
+    sidecar, tile_coordinate,
 };
+use az12_converter::preview::PreviewRecord;
 use eframe::egui;
 
+use super::canvas::View;
+use super::map_detection::{ProjectionCheck, sample_segments};
 use super::map_tiles::{TileRange, Tiles};
+use super::road_image::{self, Reading};
 
 #[derive(Default)]
 pub(super) struct Backdrop {
@@ -17,6 +26,13 @@ pub(super) struct Backdrop {
     open: bool,
     pick: Option<usize>,
     draft: Draft,
+    detection: ProjectionCheck,
+    registration_overridden: bool,
+    comparison: Option<Comparison>,
+    review_comparison: bool,
+    road_model: String,
+    road_readings: Vec<Reading>,
+    road_revision: Option<u64>,
     message: String,
     tiles: Tiles,
     opacity: f32,
@@ -26,6 +42,21 @@ pub(super) struct Backdrop {
     #[cfg(windows)]
     remember_key: bool,
     pub(super) map_status: Option<String>,
+}
+
+const COMPARISON_DURATION: Duration = Duration::from_secs(30);
+
+struct Comparison {
+    candidate: Candidate,
+    registration: MapRegistration,
+    projection: Projection,
+    previous_mode: MapMode,
+    previous_view: View,
+    opacity: f32,
+    until: Instant,
+    displayed: bool,
+    road_check: Option<(String, Vec<Segment>)>,
+    road_message: String,
 }
 
 #[derive(Default)]
@@ -85,6 +116,7 @@ impl Backdrop {
         }
         let mut tiles = std::mem::take(&mut self.tiles);
         tiles.select(MapMode::Off);
+        tiles.analyse_streets(false);
         *self = Self {
             source: source.map(|(path, hash)| (path.to_owned(), hash.to_owned())),
             tiles,
@@ -92,6 +124,9 @@ impl Backdrop {
             ..Self::default()
         };
         if let Some((path, hash)) = &self.source {
+            let reference = az12_converter::map::corridor_match::companion_path(path);
+            self.detection
+                .set_corridor_reference(reference.is_file().then_some(reference));
             match sidecar::load(path, hash) {
                 Ok(Some((registration, local))) => {
                     self.draft.crs = Some(registration.crs());
@@ -117,6 +152,32 @@ impl Backdrop {
         }
     }
 
+    pub(super) fn update_detection(
+        &mut self,
+        ctx: &egui::Context,
+        evidence: Option<&Arc<ArchiveEvidence>>,
+    ) {
+        self.detection.attach(evidence, self.draft.unit);
+        if let Some(candidate) = self.detection.poll(ctx, self.draft.unit)
+            && self.registration.is_none()
+            && !self.registration_overridden
+        {
+            self.assign_candidate(candidate);
+        }
+    }
+
+    fn assign_candidate(&mut self, candidate: Candidate) {
+        match MapRegistration::assign(candidate.crs, candidate.units) {
+            Ok(registration) => {
+                self.draft.crs = Some(candidate.crs);
+                self.draft.unit = Some(candidate.units);
+                self.draft.local = false;
+                self.activate(registration, false);
+            }
+            Err(error) => self.message = error.to_string(),
+        }
+    }
+
     pub(super) fn picking(&self) -> bool {
         self.pick.is_some()
     }
@@ -129,20 +190,35 @@ impl Backdrop {
         }
     }
 
-    pub(super) fn dialog(&mut self, ctx: &egui::Context) {
-        if !self.open {
+    pub(super) fn dialog(
+        &mut self,
+        ctx: &egui::Context,
+        view: &View,
+        preview: Option<(&[PreviewRecord], u64)>,
+    ) {
+        if !self.open || self.comparison.is_some() {
             return;
         }
         let mut open = true;
-        egui::Window::new("Background Map")
+        let result = egui::Window::new("Background Map")
             .open(&mut open)
             .default_width(410.0)
             .vscroll(true)
-            .show(ctx, |ui| self.setup(ui));
+            .show(ctx, |ui| self.setup(ui, preview));
         self.open = open && self.pick.is_none();
+        if let Some(candidate) = result.and_then(|shown| shown.inner).flatten() {
+            self.begin_comparison(candidate, view, Instant::now());
+        }
+        if !self.open {
+            self.review_comparison = false;
+        }
     }
 
-    fn setup(&mut self, ui: &mut egui::Ui) {
+    fn setup(
+        &mut self,
+        ui: &mut egui::Ui,
+        preview: Option<(&[PreviewRecord], u64)>,
+    ) -> Option<Candidate> {
         ui.label("The map is a visual reference for the plan preview.");
         let mut mode = self.tiles.mode();
         egui::ComboBox::from_label("Background")
@@ -202,7 +278,7 @@ impl Backdrop {
             }
         }
         ui.separator();
-        egui::ComboBox::from_label("MGA datum and zone")
+        egui::ComboBox::from_label("Survey projection")
             .selected_text(
                 self.draft
                     .crs
@@ -223,6 +299,11 @@ impl Backdrop {
                         }
                     }
                 }
+                ui.separator();
+                ui.label(egui::RichText::new("Brisbane City Survey Grid").strong());
+                for crs in CrsId::BRISBANE {
+                    ui.selectable_value(&mut self.draft.crs, Some(crs), crs_label(crs));
+                }
             });
         egui::ComboBox::from_label("Source coordinate units")
             .selected_text(self.draft.unit.map_or("Choose units…", SourceUnit::label))
@@ -232,7 +313,7 @@ impl Backdrop {
                 }
             });
         ui.horizontal(|ui| {
-            ui.radio_value(&mut self.draft.local, false, "Already on MGA");
+            ui.radio_value(&mut self.draft.local, false, "Already on selected grid");
             ui.radio_value(&mut self.draft.local, true, "Local grid");
         });
         if self.draft.local {
@@ -253,7 +334,10 @@ impl Backdrop {
         ui.horizontal(|ui| {
             if ui.button("Apply").clicked() {
                 match self.draft.registration() {
-                    Ok(registration) => self.activate(registration, self.draft.local),
+                    Ok(registration) => {
+                        self.registration_overridden = true;
+                        self.activate(registration, self.draft.local);
+                    }
                     Err(message) => self.message = message,
                 }
             }
@@ -271,14 +355,188 @@ impl Backdrop {
                 .clicked()
             {
                 self.registration = None;
+                self.registration_overridden = true;
                 self.projection = None;
                 self.tiles.select(MapMode::Off);
                 self.message = "Map alignment cleared for this session.".into();
             }
         });
+        ui.separator();
+        let mut compare = None;
+        ui.collapsing("Projection suggestions", |ui| {
+            if let Some(candidate) = self.detection.show(ui, self.draft.unit) {
+                self.registration_overridden = true;
+                self.assign_candidate(candidate);
+            }
+            let candidate = self.detection.comparison_candidate(self.draft.unit);
+            if let Some(candidate) = candidate
+                && let Some(reading) = self.road_readings.iter().find(|reading| reading.candidate == candidate)
+            {
+                ui.label(reading_label(reading));
+                if let Some(grid) = road_image::likely_grid(&self.road_readings, reading, |candidate| {
+                    self.detection.allows_candidate(candidate, self.draft.unit)
+                }) {
+                    ui.label(format!("Best alignment among comparable checked views: {}. Confirm the projection independently.", grid_label(grid)));
+                }
+            }
+            if ui
+                .add_enabled(
+                    candidate.is_some(),
+                    egui::Button::new("Compare on OpenStreetMap…"),
+                )
+                .on_disabled_hover_text("Select a candidate and confirm its source units first.")
+                .clicked()
+            {
+                self.review_comparison = true;
+            }
+            if let Some(candidate) = candidate.filter(|_| self.review_comparison) {
+                ui.label(format!(
+                    "Preview {} for 30 seconds. OpenStreetMap receives the visible tile location.",
+                    crs_label(candidate.crs)
+                ));
+                ui.horizontal(|ui| {
+                    if ui.button("Start comparison").clicked() {
+                        compare = Some(candidate);
+                    }
+                    if ui.button("Cancel comparison").clicked() {
+                        self.review_comparison = false;
+                    }
+                });
+            }
+            ui.collapsing("Compare local reference vectors", |ui| {
+                self.detection
+                    .local_comparison(ui, self.draft.unit, preview);
+            });
+        });
         if !self.message.is_empty() {
             ui.label(&self.message);
         }
+        compare
+    }
+
+    fn begin_comparison(&mut self, candidate: Candidate, view: &View, now: Instant) {
+        let (Ok(registration), Ok(projection)) = (
+            MapRegistration::assign(candidate.crs, candidate.units),
+            Projection::new(candidate.crs),
+        ) else {
+            self.message = "Could not initialise the comparison projection.".into();
+            return;
+        };
+        self.comparison = Some(Comparison {
+            candidate,
+            registration,
+            projection,
+            previous_mode: self.tiles.mode(),
+            previous_view: view.clone(),
+            opacity: self.opacity,
+            until: now + COMPARISON_DURATION,
+            displayed: false,
+            road_check: None,
+            road_message: "Choose a road centreline model and zoom to street detail.".into(),
+        });
+        self.tiles.analyse_streets(true);
+        self.tiles.select(MapMode::Street);
+        self.open = false;
+        self.review_comparison = false;
+    }
+
+    fn end_comparison(&mut self, view: &mut View, expired: bool) {
+        if let Some(comparison) = self.comparison.take() {
+            *view = comparison.previous_view;
+            self.tiles.select(comparison.previous_mode);
+            self.tiles.analyse_streets(false);
+            if expired && !comparison.displayed {
+                self.message =
+                    "OpenStreetMap comparison unavailable. No tiles were displayed.".into();
+                self.open = true;
+            }
+        }
+    }
+
+    fn expire_comparison(&mut self, view: &mut View, now: Instant) {
+        if self.comparison.as_ref().is_some_and(|c| now >= c.until) {
+            self.end_comparison(view, true);
+        }
+    }
+
+    pub(super) fn comparison_controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        view: &mut View,
+        preview: Option<(&[PreviewRecord], u64)>,
+    ) {
+        let revision = preview.map(|(_, revision)| revision);
+        if self.road_revision != revision {
+            self.road_readings.clear();
+            self.road_revision = revision;
+            if let Some(comparison) = &mut self.comparison {
+                comparison.road_check = None;
+                comparison.road_message =
+                    "Choose a road centreline model and zoom to street detail.".into();
+            }
+        }
+        self.road_readings
+            .retain(|reading| Some(reading.candidate.units) == self.draft.unit);
+        let now = Instant::now();
+        self.expire_comparison(view, now);
+        let Some(comparison) = self.comparison.as_mut() else {
+            return;
+        };
+        let remaining = comparison.until.saturating_duration_since(now);
+        ui.ctx()
+            .request_repaint_after(remaining.min(Duration::from_millis(250)));
+        let mut end = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!(
+                "OpenStreetMap comparison · {} · {} s",
+                comparison.candidate.crs.epsg(),
+                remaining.as_secs_f32().ceil() as u32
+            ));
+            ui.add(egui::Slider::new(&mut comparison.opacity, 0.1..=1.0).text("Opacity"));
+            end = ui.button("End comparison").clicked();
+        });
+        if end {
+            self.end_comparison(view, false);
+            return;
+        }
+        if let Some((records, _)) = preview {
+            let models: BTreeSet<_> = records
+                .iter()
+                .filter(|record| record.kind == Kind::Polyline && record.points.len() > 1)
+                .map(|record| record.model.as_str())
+                .collect();
+            ui.horizontal_wrapped(|ui| {
+                egui::ComboBox::from_id_salt("visible-road-model")
+                    .width(145.0)
+                    .selected_text(if self.road_model.is_empty() {
+                        "Road centreline model"
+                    } else {
+                        &self.road_model
+                    })
+                    .show_ui(ui, |ui| {
+                        for model in &models {
+                            ui.selectable_value(&mut self.road_model, (*model).into(), *model);
+                        }
+                    });
+                if ui
+                    .add_enabled(
+                        comparison.displayed && models.contains(self.road_model.as_str()),
+                        egui::Button::new("Check visible road match"),
+                    )
+                    .on_disabled_hover_text(
+                        "Wait for map tiles and select a road centreline model.",
+                    )
+                    .clicked()
+                {
+                    comparison.road_check = Some((
+                        self.road_model.clone(),
+                        sample_segments(records, &self.road_model),
+                    ));
+                }
+            });
+        }
+        ui.add(egui::Label::new(&comparison.road_message).truncate())
+            .on_hover_text(&comparison.road_message);
     }
 
     fn select_provider(
@@ -399,10 +657,14 @@ impl Backdrop {
         if self.tiles.mode() == MapMode::Off {
             return false;
         }
-        let (Some(registration), Some(projection)) = (self.registration, self.projection.as_ref())
-        else {
-            self.map_status =
-                Some("Assign MGA and confirm source units to display the map.".into());
+        let (registration, projection, opacity) = self.comparison.as_ref().map_or(
+            (self.registration, self.projection.as_ref(), self.opacity),
+            |c| (Some(c.registration), Some(&c.projection), c.opacity),
+        );
+        let (Some(registration), Some(projection)) = (registration, projection) else {
+            self.map_status = Some(
+                "Assign a survey projection and confirm source units to display the map.".into(),
+            );
             return false;
         };
         let corners = [
@@ -411,8 +673,8 @@ impl Backdrop {
             rect.left_bottom(),
             rect.right_bottom(),
         ];
-        let geographic = corners.map(|corner| {
-            let [x, y] = to_drawing(corner);
+        let drawing_view = corners.map(to_drawing);
+        let geographic = drawing_view.map(|[x, y]| {
             Coordinate::new(x, y)
                 .and_then(|point| registration.to_project(point))
                 .and_then(|point| projection.to_wgs84(point))
@@ -428,10 +690,15 @@ impl Backdrop {
         let range = self.tiles.update(painter.ctx(), range, &geographic);
         self.map_status = self.tiles.status().map(str::to_owned);
         let mut displayed = false;
+        let mut painted = Vec::new();
+        let checking = self
+            .comparison
+            .as_ref()
+            .is_some_and(|comparison| comparison.road_check.is_some());
         for tile in range.tiles() {
             let (base, labels) = self.tiles.textures(tile);
             if let Some(base) = base
-                && let Some(mesh) = tile_mesh(tile, base.id(), self.opacity, |point| {
+                && let Some(mesh) = tile_mesh(tile, base.id(), opacity, |point| {
                     projection
                         .from_wgs84(point)
                         .and_then(|point| registration.to_drawing(point))
@@ -448,6 +715,52 @@ impl Backdrop {
                     painter.add(egui::Shape::mesh(mesh));
                 }
                 displayed = true;
+                if checking {
+                    painted.push(tile);
+                }
+            }
+        }
+        if let Some(comparison) = &mut self.comparison {
+            comparison.displayed |= displayed;
+            if let Some((model, segments)) = comparison.road_check.take() {
+                let zoom = range.zoom();
+                let viewport = [nw, ne, se, sw].map(|point| road_image::world_pixel(point, zoom));
+                let project = |[x, y]: Point| {
+                    Coordinate::new(x, y)
+                        .and_then(|point| registration.to_project(point))
+                        .and_then(|point| comparison.projection.to_wgs84(point))
+                        .map(|point| road_image::world_pixel(point, zoom))
+                };
+                let segments = segments
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(index, [a, b])| {
+                        Some((index, [project(a).ok()?, project(b).ok()?]))
+                    });
+                let score = road_image::check(zoom, segments, |pixel| {
+                    road_image::inside_view(viewport, pixel)
+                        .then(|| self.tiles.road_pixel(zoom, pixel, &painted))
+                        .flatten()
+                });
+                let candidate = comparison.candidate;
+                self.road_readings
+                    .retain(|reading| reading.candidate != candidate);
+                comparison.road_message = match score {
+                    Ok(score) => {
+                        let reading = Reading {
+                            candidate,
+                            model,
+                            zoom,
+                            drawing_view,
+                            score,
+                        };
+                        let message = reading_label(&reading);
+                        self.road_readings.push(reading);
+                        message
+                    }
+                    Err(reason) => format!("Inconclusive. {reason}"),
+                };
+                painter.ctx().request_repaint();
             }
         }
         displayed
@@ -659,7 +972,7 @@ fn tile_mesh(
 
 impl Draft {
     fn registration(&self) -> Result<MapRegistration, String> {
-        let crs = self.crs.ok_or("Choose the MGA datum and zone.")?;
+        let crs = self.crs.ok_or("Choose the survey projection.")?;
         let unit = self.unit.ok_or("Confirm the source coordinate units.")?;
         if !self.local {
             return MapRegistration::assign(crs, unit).map_err(|error| error.to_string());
@@ -704,7 +1017,39 @@ fn coordinate_edits(ui: &mut egui::Ui, coordinates: &mut [String; 2], labels: [&
     }
 }
 
-fn crs_label(crs: CrsId) -> String {
+fn grid_label(grid: Grid) -> String {
+    match grid {
+        Grid::Mga(zone) => format!("MGA zone {zone}"),
+        Grid::Brisbane => "Brisbane City Survey Grid".into(),
+    }
+}
+
+fn reading_label(reading: &Reading) -> String {
+    let score = &reading.score;
+    let result = if score.aligned * 10 >= score.evaluable() * 7 {
+        "Road alignment"
+    } else {
+        "Inconclusive road alignment"
+    };
+    let [[west, north], _, _, [east, south]] = reading.drawing_view;
+    format!(
+        "{result}: {} of {} probes · {} · tile zoom {} · checked X {west:.1}–{east:.1}, Y {south:.1}–{north:.1}",
+        score.aligned,
+        score.evaluable(),
+        reading.model,
+        reading.zoom.value()
+    )
+}
+
+pub(super) fn crs_label(crs: CrsId) -> String {
+    let brisbane = match crs {
+        CrsId::Gda94Bcsg02 => Some("GDA94 / BCSG02"),
+        CrsId::Gda2020Bcsg2020 => Some("GDA2020 / BCSG2020"),
+        _ => None,
+    };
+    if let Some(name) = brisbane {
+        return format!("{name} ({})", crs.epsg());
+    }
     crs.mga_details().map_or_else(
         || crs.epsg().to_owned(),
         |(datum, zone)| format!("{datum} / MGA zone {zone} ({})", crs.epsg()),
@@ -838,4 +1183,108 @@ mod tests {
         ));
         assert!(backdrop.map_status.unwrap().contains("source units"));
     }
+}
+#[test]
+fn mga_detect_12_13_15_16_preserves_saved_and_manual_alignment_and_ignores_stale_results() {
+    use az12_converter::map::detection::Detection;
+    let folder = tempfile::tempdir().unwrap();
+    let first = folder.path().join("first.12daz");
+    let second = folder.path().join("second.12daz");
+    let saved = MapRegistration::assign(CrsId::Gda2020MgaZone56, SourceUnit::Metres).unwrap();
+    sidecar::save(&first, "first", saved, false).unwrap();
+    let mut map = Backdrop::default();
+    let ctx = egui::Context::default();
+    let candidate = Candidate {
+        crs: CrsId::Gda2020Bcsg2020,
+        units: SourceUnit::Metres,
+    };
+    map.sync_source(Some((&first, "first")));
+    assert_eq!(map.registration, Some(saved));
+    map.detection
+        .simulate_worker()
+        .send(Detection::Assigned(candidate))
+        .unwrap();
+    map.update_detection(&ctx, None);
+    assert_eq!(map.registration, Some(saved));
+    assert_eq!(map.tiles.mode(), MapMode::Off);
+    let stale = map.detection.simulate_worker();
+    map.sync_source(Some((&second, "second")));
+    assert!(stale.send(Detection::Assigned(candidate)).is_err());
+    assert!(map.registration.is_none());
+
+    let running = map.detection.simulate_worker();
+    map.registration_overridden = true;
+    map.activate(saved, false);
+    running.send(Detection::Assigned(candidate)).unwrap();
+    map.update_detection(&ctx, None);
+    assert_eq!(map.registration, Some(saved));
+    assert_eq!(map.tiles.mode(), MapMode::Off);
+    assert_eq!(sidecar::load(&second, "second").unwrap(), None);
+    map.save_alignment();
+    assert_eq!(
+        sidecar::load(&second, "second").unwrap(),
+        Some((saved, false))
+    );
+}
+#[test]
+fn mga_detect_18_19_22_35_comparison_is_temporary_and_restores_the_map() {
+    let folder = tempfile::tempdir().unwrap();
+    let first = folder.path().join("first.12daz");
+    let second = folder.path().join("second.12daz");
+    let mut map = Backdrop::default();
+    let mut view = View::default();
+    let candidate = Candidate {
+        crs: CrsId::Gda2020Bcsg2020,
+        units: SourceUnit::Metres,
+    };
+    let saved = MapRegistration::assign(CrsId::Gda2020MgaZone56, SourceUnit::Metres).unwrap();
+    sidecar::save(&first, "first", saved, false).unwrap();
+    map.sync_source(Some((&first, "first")));
+    let now = Instant::now();
+    view.set_zoom_percent(125);
+    map.review_comparison = true;
+    assert_eq!(map.tiles.mode(), MapMode::Off);
+    assert!(map.comparison.is_none());
+    map.begin_comparison(candidate, &view, now);
+    assert_eq!(map.tiles.mode(), MapMode::Street);
+    assert_eq!(map.registration, Some(saved));
+    assert_eq!(
+        map.comparison.as_ref().unwrap().registration.crs(),
+        candidate.crs
+    );
+    view.set_zoom_percent(300);
+    map.end_comparison(&mut view, false);
+    assert_eq!(map.tiles.mode(), MapMode::Off);
+    assert_eq!(view.zoom_percent(), 125);
+
+    map.tiles.select(MapMode::EsriSatellite);
+    map.opacity = 0.55;
+    map.begin_comparison(candidate, &view, now);
+    map.comparison.as_mut().unwrap().opacity = 0.10;
+    map.expire_comparison(&mut view, now + COMPARISON_DURATION);
+    assert_eq!(map.tiles.mode(), MapMode::EsriSatellite);
+    assert_eq!(map.opacity, 0.55);
+    assert!(map.message.contains("unavailable"));
+    assert_eq!(
+        sidecar::load(&first, "first").unwrap(),
+        Some((saved, false))
+    );
+
+    map.begin_comparison(candidate, &view, now);
+    map.road_readings.push(Reading {
+        candidate,
+        model: "Roads".into(),
+        zoom: az12_converter::map::Zoom::new(17).unwrap(),
+        drawing_view: [[0.0; 2]; 4],
+        score: road_image::Score {
+            aligned: 6,
+            probes: (0..6).collect(),
+        },
+    });
+    map.comparison.as_mut().unwrap().road_check = Some(("Roads".into(), Vec::new()));
+    map.sync_source(Some((&second, "second")));
+    assert!(map.comparison.is_none());
+    assert!(map.road_readings.is_empty());
+    assert_eq!(map.tiles.mode(), MapMode::Off);
+    assert!(sidecar::load(&second, "second").unwrap().is_none());
 }

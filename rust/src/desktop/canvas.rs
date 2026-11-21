@@ -12,7 +12,7 @@ pub struct SkipOverlay<'a> {
     pub highlighted: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct View {
     origin: Point,
     pan: Vec2,

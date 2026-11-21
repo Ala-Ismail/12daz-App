@@ -15,6 +15,7 @@ use az12_converter::map::{
 use eframe::egui;
 use serde::Deserialize;
 
+use super::road_image::{RoadMask, TILE_PIXELS};
 use super::tile_transport::{Body, Data, Queue};
 
 const TARGET_TILES: u64 = 32;
@@ -33,6 +34,9 @@ pub(super) struct TileRange {
 }
 
 impl TileRange {
+    pub(super) fn zoom(self) -> Zoom {
+        self.zoom
+    }
     pub(super) fn covering(corners: &[LonLat; 4], max_zoom: u8) -> Option<Self> {
         for level in (0..=max_zoom).rev() {
             let zoom = Zoom::new(level).ok()?;
@@ -106,6 +110,7 @@ impl Request {
 struct Texture {
     handle: egui::TextureHandle,
     expires: Option<Instant>,
+    road_mask: Option<RoadMask>,
 }
 
 #[derive(Deserialize)]
@@ -201,6 +206,7 @@ impl Viewport {
 #[derive(Default)]
 pub(super) struct Tiles {
     mode: MapMode,
+    analyse_streets: bool,
     google_key: String,
     esri_key: String,
     generation: u64,
@@ -216,6 +222,36 @@ pub(super) struct Tiles {
 }
 
 impl Tiles {
+    pub(super) fn analyse_streets(&mut self, enabled: bool) {
+        if self.analyse_streets != enabled {
+            self.analyse_streets = enabled;
+            if self.mode == MapMode::Street {
+                self.invalidate();
+            }
+        }
+    }
+
+    pub(super) fn road_pixel(
+        &self,
+        zoom: Zoom,
+        pixel: [f64; 2],
+        painted: &[TileId],
+    ) -> Option<bool> {
+        let [x, y] = pixel;
+        if !self.analyse_streets || !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 {
+            return None;
+        }
+        let tile = TileId::new(zoom, (x / TILE_PIXELS) as u32, (y / TILE_PIXELS) as u32).ok()?;
+        if !painted.contains(&tile) {
+            return None;
+        }
+        self.textures
+            .get(&(tile, Layer::Streets))?
+            .road_mask
+            .as_ref()?
+            .pixel(x % TILE_PIXELS, y % TILE_PIXELS)
+    }
+
     #[cfg(debug_assertions)]
     pub(super) fn capture_complete(&self) -> bool {
         self.visible
@@ -504,6 +540,8 @@ impl Tiles {
         let error = match (key, result) {
             (_, Err(error)) => error,
             (Request::Tile(tile, layer), Ok(Data::Image(image, lifetime))) => {
+                let road_mask = (self.analyse_streets && layer == Layer::Streets)
+                    .then(|| RoadMask::new(&image));
                 let texture = ctx.load_texture("map tile", image, egui::TextureOptions::LINEAR);
                 let expires = lifetime.and_then(|span| Instant::now().checked_add(span));
                 self.textures.insert(
@@ -511,6 +549,7 @@ impl Tiles {
                     Texture {
                         handle: texture,
                         expires,
+                        road_mask,
                     },
                 );
                 return;
@@ -609,6 +648,42 @@ mod tests {
             egui::ColorImage::filled([1, 1], egui::Color32::GREEN),
             Some(Duration::from_secs(60)),
         )
+    }
+
+    #[test]
+    fn mga_detect_33_35_raster_sampling_is_read_only_and_ignores_unpainted_or_stale_tiles() {
+        let ctx = egui::Context::default();
+        let range = TileRange::covering(&footprint(), 17).unwrap();
+        let tile = range.tiles().next().unwrap();
+        let pixel = [
+            f64::from(tile.x()) * TILE_PIXELS + 50.0,
+            f64::from(tile.y()) * TILE_PIXELS + 50.0,
+        ];
+        let mut tiles = Tiles::default();
+        tiles.select(MapMode::Street);
+        tiles.analyse_streets(true);
+        tiles.visible = Some(range);
+        let generation = tiles.generation;
+        let key = Request::Tile(tile, Layer::Streets);
+        let data = || {
+            Data::Image(
+                egui::ColorImage::filled([256, 256], egui::Color32::WHITE),
+                Some(Duration::from_secs(60)),
+            )
+        };
+        assert_eq!(tiles.road_pixel(range.zoom(), pixel, &[tile]), None);
+        tiles.accept(&ctx, generation, key, Ok(data()));
+        assert_eq!(tiles.road_pixel(range.zoom(), pixel, &[]), None);
+        for _ in 0..2 {
+            assert_eq!(tiles.road_pixel(range.zoom(), pixel, &[tile]), Some(true));
+        }
+        assert!(tiles.transport.is_none() && tiles.pending.is_empty());
+        assert_eq!(tiles.generation, generation);
+        tiles.analyse_streets(false);
+        tiles.visible = Some(range);
+        tiles.accept(&ctx, generation, key, Ok(data()));
+        assert!(tiles.textures.is_empty());
+        assert_eq!(tiles.road_pixel(range.zoom(), pixel, &[tile]), None);
     }
 
     #[test]

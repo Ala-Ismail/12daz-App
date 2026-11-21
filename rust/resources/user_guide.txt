@@ -9,9 +9,10 @@ Contents
 - 1.6 Review the results
 - 1.7 Supported geometry
 - 1.8 Set up a background map
-- 1.9 Get a Google Maps API key
-- 1.10 Get an Esri API key
-- 1.11 About and support
+- 1.9 Map projection suggestions
+- 1.10 Get a Google Maps API key
+- 1.11 Get an Esri API key
+- 1.12 About and support
 
 1.1 Open an archive
 Choose File > Open archive, Ctrl+O, or Open archive in the title row. Select a ZIP .12daz containing one .12da payload, or a plain .12da file. The archive and conversion stay on this computer. Automatic decoding honours Unicode BOMs and otherwise uses strict UTF-8. For older files, open Input options and choose a fallback encoding.
@@ -37,11 +38,25 @@ Report shows selected and skipped objects, emitted entities, warnings, and layer
 Points, supported straight and circular strings, closed outlines, circles and arcs, single-line world-size text, supported solved and reconstructed alignments, and verified drainage plan spans in Flatten 2D. Keep Z can sample supported profiles and selected elevated arcs. The converter omits unsupported civil semantics, symbols, meshes and source labels. Drainage Keep Z requires verified source elevations and is unavailable. The output is DXF 2018.
 
 1.8 Set up a background map
-Open a survey archive and choose View > Background Map. If the survey already uses MGA, select its datum and zone, confirm the source coordinate units and select Apply. For a local grid, select Local grid and enter or pick a drawing point with its known map coordinates. Add a second pair to include scale and rotation. Save alignment writes the map registration beside the source. The background is for visual context. Map settings leave survey coordinates and DXF exports unchanged.
+Open a survey archive and choose View > Background Map. For a survey on MGA or Brisbane City Survey Grid, select its exact Survey projection, confirm the source coordinate units and select Apply. For a local grid, select Local grid and enter or pick a drawing point with its known map coordinates. Add a second pair to include scale and rotation. Save alignment writes the map registration beside the source. The background is for visual context. Map settings leave survey coordinates and DXF exports unchanged.
 
-The map starts Off. Choose OpenStreetMap Streets, Google Satellite with Labels or Esri World Imagery with Labels to send the visible location to that provider. Map credits appear at the lower left. OpenStreetMap requires no key. Google and Esri may charge for requests. Keys stay in memory unless you choose Remember this key on this PC. Selecting Google or Esri automatically loads its saved key from Windows Credential Manager when there is no key for that provider in the current session. Use saved key reloads it manually. Switch the background to Off to stop map requests. Conversion remains available offline.
+The map starts Off. Choose OpenStreetMap Streets, Google Satellite with Labels or Esri World Imagery with Labels to send the visible location to that provider. Map credits appear at the lower left. OpenStreetMap requires no key. Google and Esri may charge for requests. Keys stay in memory unless you choose Remember this key on this PC. Selecting Google or Esri automatically loads its saved key from Windows Credential Manager when there is no key for that provider in the current session. Use saved key reloads it manually. Switch the background to Off to stop basemap tile requests. Conversion remains available offline.
 
-1.9 Get a Google Maps API key
+1.9 Map projection suggestions
+1. Open a survey and choose View > Background Map > Projection suggestions.
+2. Select Detect MGA. The app checks compatible grids in the background and assumes metres if source units are unset. The comparison runs without choosing a grid, road model or reference file.
+3. Expand one of the best grids to inspect its datum variants. More than 70% combined road-edge and centreline agreement is required for Match. Lower positive scores are marked Review. Grids without usable reference coverage remain unchecked.
+4. Select Review grid for a datum and confirm it against survey information. Choose Apply reviewed grid to set the map alignment. Use Save alignment if you want the app to reuse it when you reopen the archive.
+
+Detect MGA uses local road vectors first. When coverage is missing, it sends candidate area bounds to the OpenStreetMap Overpass service. Your archive and survey linework stay on this computer. To run the check offline on open, place a WGS 84 road extract beside the archive, for example survey.12daz.osm-roads.geojson. You can also use Local road references > Choose local extracts. A GeoJSON FeatureCollection needs top-level coverage [west, south, east, north] and source_date fields.
+
+If no grid can be scored, check the source units and reference coverage. Use Manual grid selection if you know the MGA zone, or enter a known WGS 84 latitude and longitude and choose Check known location. Road agreement can help identify the zone. Use survey records or control points to confirm the datum.
+
+Compare on OpenStreetMap opens a 30-second preview for a selected candidate after confirmation. At street detail, choose a road centreline model and select Check visible road match. Compare the same road section and scale across candidates. End comparison restores the previous map.
+
+Compare local reference vectors lets you check a chosen centreline model and, optionally, a different boundary model against a local WGS 84 GeoJSON extract. The road linework provides the main evidence and comparable boundaries add context.
+
+1.10 Get a Google Maps API key
 1. Sign in to Google Cloud Console. Create or select a project and link it to an active Cloud Billing account.
 2. Enable Map Tiles API in that project’s API Library.
 3. Go to Google Maps Platform > Keys & Credentials and create an API key. Under API restrictions, select Map Tiles API for that key.
@@ -49,7 +64,7 @@ The map starts Off. Choose OpenStreetMap Streets, Google Satellite with Labels o
 5. If the provider rejects the key, check that billing, API enablement and the key restrictions all use the same Google Cloud project.
 https://developers.google.com/maps/documentation/tile/get-api-key
 
-1.10 Get an Esri API key
+1.11 Get an Esri API key
 1. Sign in to your ArcGIS Location Platform portal.
 2. Go to Content > My Content > New item > Developer credentials and choose API key credentials.
 3. Set an expiration date. Under location services privileges, select both Basemaps and Static Basemap Tiles so the key can load imagery and labels.
@@ -57,7 +72,7 @@ https://developers.google.com/maps/documentation/tile/get-api-key
 5. If imagery or labels fail to load, check both privileges and the expiration date. If you change privileges, regenerate the key in ArcGIS and update it in 12dAZ.
 https://developers.arcgis.com/documentation/security-and-authentication/api-key-authentication/tutorials/create-an-api-key/location-platform/
 
-1.11 About and support
+1.12 About and support
 Help shows the installed version, license, and third-party notices offline. The brief splash closes automatically or with Continue, Enter or Escape. The optional PayPal link opens an external page only when selected.
 
 Copyright (c) 2026 Lambda Technologies Pty Ltd ABN 22 647 165 160

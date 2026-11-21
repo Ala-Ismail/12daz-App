@@ -1,0 +1,10 @@
+[package]
+name = "road-boundary-engine-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+acadrust = "=0.6.4"
+serde_json = "1.0"
+tempfile = "3.27"

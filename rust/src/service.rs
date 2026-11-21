@@ -128,6 +128,9 @@ pub struct Report {
     pub preview: Vec<PreviewRecord>,
     #[serde(skip)]
     pub skipped_elements: Vec<SkippedElement>,
+    #[cfg(feature = "desktop")]
+    #[serde(skip)]
+    pub map_evidence: Option<std::sync::Arc<crate::map::detection::ArchiveEvidence>>,
     pub preview_simplified: bool,
     pub preview_omitted_models: Vec<String>,
     pub preview_note: &'static str,
@@ -468,6 +471,9 @@ fn skipped_paths(
 
 pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
     let inspect_skipped = job.output.is_none() && job.preview_limit > 0;
+    #[cfg(feature = "desktop")]
+    let mut map_evidence = (inspect_skipped && options.models.is_none())
+        .then(crate::map::detection::ArchiveEvidence::default);
     let geometry = geometry_options(options)?;
     let start = Instant::now();
     let default_report = job.output.filter(|_| job.report.is_none()).map(report_path);
@@ -534,6 +540,14 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
             })? {
                 let key = source.model.case_fold().collect::<String>();
                 let index = accumulation.model_index(key.clone(), &source);
+                #[cfg(feature = "desktop")]
+                if let Some(evidence) = &mut map_evidence {
+                    let model = &accumulation.models[index].name;
+                    crate::geometry::visit_source_xy(&source, job.cancel, |point| {
+                        evidence.observe(model, point);
+                    })?;
+                    evidence.road_sides.observe(&source, model, job.cancel)?;
+                }
                 if selected.as_ref().is_some_and(|names| !names.contains(&key)) {
                     continue;
                 }
@@ -612,6 +626,8 @@ pub fn run_job(path: &Path, options: &Options, job: Job<'_>) -> Result<Report> {
         bounds_note: "Preview bounds; curved extents sampled for display.",
         preview: preview.records,
         skipped_elements,
+        #[cfg(feature = "desktop")]
+        map_evidence: map_evidence.map(std::sync::Arc::new),
         preview_simplified: preview.limited,
         preview_omitted_models: preview.omitted_models,
         preview_note: "Preview prioritizes path shape and spatial coverage within the shared display allowance. DXF export uses independent geometry.",

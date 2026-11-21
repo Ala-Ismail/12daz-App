@@ -23,7 +23,7 @@ impl SourceUnit {
         }
     }
 
-    fn metres(self) -> f64 {
+    pub(super) fn metres(self) -> f64 {
         match self {
             Self::Metres => 1.0,
             Self::Millimetres => 0.001,
@@ -32,7 +32,7 @@ impl SourceUnit {
         }
     }
 
-    fn project(self, point: Coordinate) -> Result<Coordinate> {
+    pub(super) fn project(self, point: Coordinate) -> Result<Coordinate> {
         let scale = self.metres();
         Coordinate::new(point.x() * scale, point.y() * scale)
     }
@@ -46,7 +46,7 @@ pub struct MapRegistration {
 
 impl MapRegistration {
     pub fn assign(crs: CrsId, units: SourceUnit) -> Result<Self> {
-        if crs.mga_details().is_none() {
+        if !crs.is_survey_grid() {
             return Err(MapError::TransformationFailed);
         }
         let origin = Coordinate::new(0.0, 0.0)?;
@@ -62,7 +62,7 @@ impl MapRegistration {
         first: (Coordinate, Coordinate),
         second: Option<(Coordinate, Coordinate)>,
     ) -> Result<Self> {
-        if crs.mga_details().is_none() {
+        if !crs.is_survey_grid() {
             return Err(MapError::TransformationFailed);
         }
         let origin = units.project(first.0)?;

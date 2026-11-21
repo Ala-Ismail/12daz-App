@@ -27,14 +27,24 @@ Extract the complete Windows x64 ZIP and run `12dAZ-Converter.exe` from the extr
 
 ## Background maps
 
-1. Open a survey and select **View → Background Map**. Choose the **MGA datum and zone** (GDA2020 or GDA94, zones 46–56) and confirm the **Source coordinate units**.
-2. Choose **Already on MGA** for projected survey coordinates. For a **Local grid**, match one survey point to a known MGA or WGS 84 position for translation, or add a second point for scale and rotation. Select **Apply**.
+1. Open a survey and select **View → Background Map**. Choose the **Survey projection** and confirm the **Source coordinate units**. The published v0.3.0 preview supports GDA2020 and GDA94 MGA zones 46–56.
+2. Use the direct grid option for surveyed coordinates already on the selected projection. For a **Local grid**, match one survey point to a known projected or WGS 84 position for translation, or add a second point for scale and rotation. Select **Apply**.
 3. Select **OpenStreetMap Streets**, **Google Satellite with Labels**, or **Esri World Imagery with Labels**. OpenStreetMap requires no key. For Google or Esri, follow the setup steps in **Help → User Guide**. Enter your API key and select **Set key**. Select **Remember this key on this PC** before setting it to store it in Windows Credential Manager.
 4. Adjust the map opacity to keep survey linework readable. Use **Save alignment** to store the alignment and source units beside the survey in a `.12daz-map.json` sidecar.
 
 Maps are off by default. When enabled, the selected provider receives requests for the visible map area. The basemap serves as a visual reference in the plan preview. DXF export runs offline and preserves the source coordinates.
 
+Builds from the current Rust source also support **GDA94 / BCSG02 (EPSG:3113)** and **GDA2020 / BCSG2020 (EPSG:20047)**. Use **Manual grid selection** under **Projection suggestions** when you already know the grid, source units or project location. During **Compare on OpenStreetMap**, choose a road centreline model and select **Check visible road match** for an approximate score from the displayed tiles. You can also compare road and boundary models against a local OpenStreetMap GeoJSON extract. Apply the projection after confirming it.
+
 [Website examples](https://12daz-app-website.vercel.app/#background-maps)
+
+### Automatic projection suggestions
+
+In current source builds, select **View > Background Map > Projection suggestions > Detect MGA**. The app checks compatible grids in the background and shows up to three ranked results. It assumes metres when units are unset. Datum variants appear under the same grid.
+
+Detect MGA uses local road vectors first. For missing coverage it sends only the candidate area bounds to OpenStreetMap Overpass. To compare offline on open, put a local WGS 84 extract beside the archive, for example `survey.12daz.osm-roads.geojson`.
+
+The results report combined road-edge and centreline agreement. **Match** requires more than 70%. Lower positive scores are shown for review and grids without coverage remain unchecked. Select a datum and choose **Apply reviewed grid** to change the map alignment. **Help > Map Projection Suggestions** opens the offline guide at the relevant section. [Grid sweep tests](docs/mga_detection_acceptance_tests.md#10-automatic-grid-sweep) · [Road-engine validation](docs/road_boundary_engine_test_requirements.md#84-integrated-corridor-comparison)
 
 ## Run from source
 
@@ -80,7 +90,7 @@ The reference survey produced equivalent Python and Rust reports and reopened ge
 ```powershell
 cargo test --manifest-path rust/Cargo.toml --locked --features desktop
 .\scripts\build_rust_windows.ps1
-.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.3.0-Windows-x64.zip
+.\scripts\test_rust_windows_package.ps1 -Archive .\dist\rust-candidate\12dAZ-Converter-0.4.0-Windows-x64.zip
 ```
 
 The package script writes a ZIP and `SHA256SUMS.txt` to `dist/rust-candidate/`. Use `-OutputDirectory` to build into another folder and `-Offline` after the locked dependencies are cached. The package test verifies the checksum and executable metadata, opens the extracted desktop in smoke-test mode, and checks GUI/CLI parity with synthetic data.
@@ -99,6 +109,11 @@ The release workflow uses the Rust manifest where present and uses the Python bu
 
 - [Converter design and original GUI concept](12daz_design.md)
 - Plan preview design for [background map integration](design.md#1-background-maps) and the [skipped-elements preview](design.md#2-preview-of-skipped-elements)
+- [Projection suggestions and OpenStreetMap comparison](design.md#15-automatic-mga-detection-and-assignment), [Brisbane City Survey Grid](design.md#16-brisbane-city-survey-grid), and [acceptance tests](docs/mga_detection_acceptance_tests.md)
+- [Candidate filters and visible road-shape checks](design.md#18-narrowing-projection-candidates-and-checking-road-shapes)
+- [Brainstorming proposal for projection suggestions from road shapes](detection_enhancment.md)
+- [Standalone Rust road-boundary engine, run instructions and acceptance](docs/road_boundary_engine_requirements.md)
+- [Road-boundary engine test requirements](docs/road_boundary_engine_test_requirements.md)
 - [Background map test requirements](docs/background_map_test_requirements.md)
 - [Skipped-elements preview test requirements](docs/skipped_elements_test_requirements.md)
 - [Implementation steps](docs/implementation_steps.md), [product test requirements and cases](docs/test_requirements.md), and [expanded geometry fixture](tests/fixtures/expanded_geometry.md)

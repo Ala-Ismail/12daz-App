@@ -42,7 +42,7 @@ pub fn load(archive: &Path, source_hash: &str) -> io::Result<Option<(MapRegistra
     let saved: Sidecar = serde_json::from_slice(&bytes)?;
     if saved.version != MAP_SIDECAR_SCHEMA_VERSION
         || saved.source_sha256 != source_hash
-        || saved.registration.crs().mga_details().is_none()
+        || !saved.registration.crs().is_survey_grid()
     {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
